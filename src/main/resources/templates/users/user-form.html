@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <title>Alta de Usuario</title>
+  <!--/*/ <th:block th:include="shared/header :: header"></th:block> /*/-->
+</head>
+
+<body>
+<nav th:replace="shared/navbar :: navbar"></nav>
+<div class="container py-5">
+  <div class="row">
+    <div class="col-xs-12 col-md-6 mx-auto">
+      <div class="card">
+        <div class="card-body">
+          <h4 class="card-title">Crear Usuario</h4>
+          <form th:action="@{/users/create}" th:object="${user}" method="post" id="userForm">
+            <div class="form-group">
+              <input type="hidden" class="form-control" name="id" th:field="*{id}">
+            </div>
+            <div class="form-group">
+              <label for="username">Nombre de usuario</label>
+                <input type="text" class="form-control" id="username" name="username"
+                     placeholder="Ingrese nombre de ususario"
+                     th:field="*{username}">
+            </div>
+            <div class="form-group">
+              <label for="firstname">Nombre</label>
+              <input type="text" class="form-control" id="firstname" name="firstname" placeholder="Ingrese nombre"
+                     th:field="*{firstname}">
+            </div>
+            <div class="form-group">
+              <label for="lastname">Apellido</label>
+              <input type="text" class="form-control" id="lastname" name="lastname" placeholder="Ingrese apellido"
+                     th:field="*{lastname}">
+            </div>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" class="form-control" id="email" name="email" placeholder="Ingrese email"
+                     th:field="*{email}">
+            </div>
+            <div class="form-group">
+              <label for="password">Contraseña</label>
+              <input type="text" class="form-control" id="password" name="password" placeholder="Ingrese la contraseña"
+                     th:field="*{password}">
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Repetir contraseña</label>
+              <input type="text" class="form-control" id="confirmPassword" name="confirmPassword"
+                     placeholder="Ingrese la contraseña">
+            </div>
+            <div class="form-check">
+              <label class="form-check-label">
+                <input type="checkbox" id="enabled" name="enabled" class="form-check-input" th:field="*{enabled}">
+                Habilitado
+              </label>
+            </div>
+
+            <!--
+            <div class="form-group">
+              <label for="authoritiesList">Perfiles</label>
+              <div class="input-group">
+                <select id="authoritiesList" class="form-control" data-bind="value: authoritySelected">
+                  <option value="">Seleccionar perfil</option>
+                  <option th:each="authority : ${authoritiesList}" th:value="${authority.id} + '/' + ${authority.name}"
+                          th:text="${authority.name}"></option>
+                </select>
+                <span class="input-group-btn">
+                <button class="btn btn-secondary" type="button" data-bind="click: addAuthority">Agregar</button>
+              </span>
+              </div>
+            </div>
+            -->
+
+            <table class="table table-hover table-sm">
+              <thead class="thead-inverse">
+              <tr>
+                <th>Perfil</th>
+                <th>Estado</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="authority: ${authoritiesList}">
+                <td>
+                  <div class="form-check">
+                    <label class="form-check-label">
+                      <input type="checkbox" class="form-check-input"
+                             th:field="*{authorities}" th:value="${authority.id}">
+                      <span th:text="${authority.name}"></span>
+                    </label>
+                  </div>
+                </td>
+                <td></td>
+              </tr>
+              </tbody>
+            </table>
+            <!--
+                        <table class="table">
+                          <thead class="thead-default">
+                          <tr>
+                            <th>Perfil</th>
+                            <th>Accion</th>
+                          </tr>
+                          </thead>
+                          <tbody data-bind="foreach: authorityList">
+                          <tr>
+                            <td>
+                              <p data-bind="text: name"></p>
+                              <input type="text" data-bind="value: id, attr: {'th:field': '*{authoritiest[' + $index() + ']}'}"/>
+                            </td>
+                            <td>
+                              <a href="#" class="btn btn-sm bt-danger"
+                                 data-bind="click: $parent.removeAuthority.bind($data,$index())">Eliminar</a>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+            -->
+            <div class="form-group">
+              <button type="submit" class="btn btn-primary pull-right">Crear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!--/*/ <th:block th:include="shared/footer :: footer"></th:block> /*/-->
+<script type="text/javascript" src="/js/vm/vm.user-form.js"></script>
+</body>
+
+</html>
