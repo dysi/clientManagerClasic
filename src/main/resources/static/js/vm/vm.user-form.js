@@ -1,29 +1,60 @@
 (function VMUserForm() {
 
+  // Form validation
+  $("#userForm").validate({
+    rules: {
+      username: {
+        required: true,
+        minlength: 4
+      },
+      firstname: {
+        required: true,
+        minlength: 4
+      },
+      lastname: {
+        required: true,
+        minlength: 4
+      },
+      email: {
+        required: true,
+        email: true
+      },
+      password: {
+        required: true,
+        minlength: 4
+      },
+      confirmPassword: {
+        required: true,
+        equalTo: "#password"
+      },
+      authority: {
+        required: true
+      }
+    },
+    submitHandler: function (form) {
+      debugger;
+      var authValid = false;
+      $(".submit").attr("disabled", true);
+      $(".authority").each(function(index, value){
+        if(!authValid){
+          authValid = $(this).is(":checked");
+        }
+      })
+      if (!$("#userForm").valid() || !authValid) {
+        $(".submit").attr("disabled", false);        
+        return false;
+      }
+      form.submit();
+    }
+  });
 
   function UserFormVM() {
     var vm = this;
-    // credentials
-    vm.password = ko.observable("");
-    vm.authoritySelected = ko.observable();
 
     // var
     vm.isLoading = ko.observable(false);
-    vm.authorityList = ko.observableArray();
 
     // Methods handlers
-    vm.addAuthority = addAuthority;
-    vm.removeAuthority = removeAuthority;
-
-    function addAuthority(authorityId) {
-
-      console.log(authorityId);
-
-    }
-
-    function removeAuthority(index, data) {
-      vm.authorityList.splice(index, 1);
-    }
 
   }
 

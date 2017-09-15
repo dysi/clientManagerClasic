@@ -5,6 +5,21 @@ function VMUserLogin(msg) {
 		alertify.success(msg);
 	}
 
+	// Form validation
+	$("#loginForm").validate({
+		rules: {
+			username: {
+				required: true,
+				minlength: 4
+			},
+			password: {
+				required: true,
+				minlength: 4
+			}
+		}
+	});
+
+	// KnokoutJS
 	function UserLoginVM() {
 		var vm = this;
 		// credentials

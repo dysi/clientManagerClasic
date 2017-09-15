@@ -3,7 +3,7 @@
 
 <head>
   <title>Ingreso de Usuario</title>
-  <!--/*/ <th:block th:include="shared/header :: header"></th:block> /*/-->
+  <th:block th:include="shared/header :: header"></th:block>
 </head>
 
 <body class="login-gradient">
@@ -12,10 +12,12 @@
     <div class="col-md-12">
       <h2 class="text-center text-white mb-4">AngryBox Gestor de Clientes</h2>
       <div class="row">
-        <div class="col-xs-12 col-md-6 alert alert-warning" role="alert"
+        <div class="col-xs-12 col-md-6 mx-auto alert alert-warning" role="alert"
              data-bind="visible: errorAlertMsg">
           <p data-bind="text: errorAlertMsg"></p>
         </div>
+      </div>
+      <div class="row">
         <div class="col-md-6 mx-auto">
           <span class="anchor"></span>
           <!-- form card login -->
@@ -57,15 +59,12 @@
 </div>
 <!--/container-->
 
-<!--/*/ <th:block th:include="shared/footer :: footer"></th:block> /*/-->
-
+<th:block th:include="shared/footer :: footer"></th:block>
 <script type="text/javascript" src="/js/vm/vm.user-login.js"></script>
 <script th:inline="javascript">
-/*<![CDATA[*/
-  VMUserLogin([[${message}]]);
-/*]]>*/
-
+/*<![CDATA[*/ VMUserLogin([[${message}]]) /*]]>*/
 </script>
+
 </body>
 
 </html>
