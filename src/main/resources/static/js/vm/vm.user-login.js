@@ -1,9 +1,11 @@
-function VMUserLogin(msg) {
+function VMUserLogin(msg, port) {
 
 	// Params handlers
 	if (msg) {
 		alertify.success(msg);
 	}
+	
+	console.log("Port " + port);
 
 	// Form validation
 	$("#loginForm").validate({
@@ -29,6 +31,7 @@ function VMUserLogin(msg) {
 		// var
 		vm.isLoading = ko.observable(false);
 		vm.errorAlertMsg = ko.observable("");
+		// vm.renderHome = renderHome;
 
 		// Methods
 		vm.onSubmit = login;
@@ -41,7 +44,7 @@ function VMUserLogin(msg) {
 				password: vm.password()
 			}
 
-			axios.post("http://localhost:3000/auth",
+			axios.post("/clientmanager/auth",
 					credentials, {
 						headers: {
 							'Content-Type': 'application/json'
@@ -50,6 +53,8 @@ function VMUserLogin(msg) {
 				.then(function (res) {
 					console.log(res);
 					vm.isLoading(false);
+					localStorage.setItem('token', res.data.token);
+					window.location.href = "/clientmanager/home";
 				})
 				.catch(function (error) {
 					vm.isLoading(false);
@@ -57,6 +62,7 @@ function VMUserLogin(msg) {
 					console.log(error);
 				});
 		}
+		
 	}
 
 	ko.applyBindings(new UserLoginVM());

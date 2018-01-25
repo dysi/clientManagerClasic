@@ -37,7 +37,7 @@ public class ClientRestController {
         } catch (Exception e) {
             return new ResponseEntity<License>(HttpStatus.BAD_REQUEST);
         }
-    }
+    } 
 
 }
 

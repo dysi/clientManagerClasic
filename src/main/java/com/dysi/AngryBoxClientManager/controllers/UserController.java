@@ -4,7 +4,9 @@ import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
 import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.services.UserService;
 import com.google.gson.Gson;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -19,11 +21,16 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    
+    @Value("${server.port}")
+    private int port;
 
     @RequestMapping("/login")
     public String getLoginUserPage(Model model, String message) {
-
+    	
+    	int currentPort = this.port;
         model.addAttribute("message", message);
+        model.addAttribute("port", this.port);
         return "users/login";
     }
 

@@ -79,6 +79,7 @@ public class License {
         this.prePayment = prePayment;
     }
 
+    @JsonIgnore
     public List<Payment> getPaymentList() {
         return paymentList;
     }
