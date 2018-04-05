@@ -1,9 +1,7 @@
 package com.dysi.AngryBoxClientManager.controllers;
 
 import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
-import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.services.UserService;
-import com.google.gson.Gson;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.servlet.ModelAndView;
 
 @Controller
 @RequestMapping("/users")
@@ -32,6 +29,7 @@ public class UserController {
         model.addAttribute("message", message);
         model.addAttribute("port", this.port);
         return "users/login";
+        
     }
 
     @RequestMapping("/create")
@@ -41,6 +39,7 @@ public class UserController {
         model.addAttribute("user", user);
         model.addAttribute("authoritiesList", userService.getAuthorities());
         return "users/user-form";
+        
     }
 
     @RequestMapping("/create/{id}")
@@ -49,10 +48,12 @@ public class UserController {
         model.addAttribute("user", userService.getUserCreateDTOById(id));
         model.addAttribute("authoritiesList", userService.getAuthorities());
         return "users/user-form";
+        
     }
 
     @RequestMapping(value = "/create", method = RequestMethod.POST)
-    public String processForm(Model model,@ModelAttribute(value = "user") UserCreateDTO userCreateDTO) {
+    public String processForm(Model model, 
+    		@ModelAttribute(value = "user") UserCreateDTO userCreateDTO) {
 
         try {
             if (userCreateDTO.getId() != null) {
@@ -67,6 +68,6 @@ public class UserController {
         } catch (Exception e) {
             return this.getCreateUserPage(model, userCreateDTO);
         }
-
+        
     }
 }

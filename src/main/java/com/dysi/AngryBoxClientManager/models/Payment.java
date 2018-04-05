@@ -12,6 +12,7 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
+    // descuento
     private Double discount;
     // fecha de baja
     private Calendar removeDate;

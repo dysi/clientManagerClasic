@@ -1,6 +1,9 @@
 package com.dysi.AngryBoxClientManager.models;
 
 import javax.persistence.*;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.List;
 
 @Entity
@@ -70,6 +73,7 @@ public class Client {
         this.cuil = cuil;
     }
 
+    @JsonIgnore
     public User getUser() {
         return user;
     }
@@ -78,6 +82,7 @@ public class Client {
         this.user = user;
     }
 
+    @JsonIgnore
     public List<License> getLicenses() {
         return licenses;
     }

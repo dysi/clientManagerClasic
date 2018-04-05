@@ -54,7 +54,7 @@ function VMUserLogin(msg, port) {
 					console.log(res);
 					vm.isLoading(false);
 					localStorage.setItem('token', res.data.token);
-					window.location.href = "/clientmanager/home";
+					window.location.href = "/clientmanager/index/home";
 				})
 				.catch(function (error) {
 					vm.isLoading(false);

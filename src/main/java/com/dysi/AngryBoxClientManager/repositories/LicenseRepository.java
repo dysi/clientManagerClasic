@@ -11,5 +11,7 @@ import java.util.List;
 public interface LicenseRepository extends JpaRepository<License, Long> {
 
     public List<License> findLicensesByClient(Client client);
+    
+    public List<License> findLicensesByCompanyId(Long companyId);
 
 }

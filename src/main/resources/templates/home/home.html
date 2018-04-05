@@ -1,36 +1,299 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+
 <head>
-  <title>Inicio: Gestor de clientes</title>
-  <!--/*/ <th:block th:include="shared/header :: header"></th:block> /*/-->
+<title>Inicio: Gestor de clientes</title>
+<th:block th:include="shared/header :: header"></th:block>
+
 </head>
 <body>
-<header>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-    <a class="navbar-brand" href="#">Navbar</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
 
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav mr-auto">
-        <li class="nav-item active">
-          <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">Link</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link disabled" href="#">Disabled</a>
-        </li>
-      </ul>
-    </div>
-  </nav>
-</header>
+	<header>
+		<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+			<a class="navbar-brand" href="#">Client Manager</a>
+			<button class="navbar-toggler" type="button" data-toggle="collapse"
+				data-target="#navbarSupportedContent"
+				aria-controls="navbarSupportedContent" aria-expanded="false"
+				aria-label="Toggle navigation">
+				<span class="navbar-toggler-icon"></span>
+			</button>
 
-<h1>Titulo de prueba 5</h1>
+			<div class="collapse navbar-collapse" id="navbarSupportedContent">
+				<ul class="navbar-nav mr-auto">
+					<li class="nav-item active"><a class="nav-link" href="#">Home
+							<span class="sr-only">(current)</span>
+					</a></li>
+				</ul>
+			</div>
+		</nav>
+	</header>
 
-<!--/*/ <th:block th:include="shared/footer :: footer"></th:block> /*/-->
+	<div id="container.home" class="container">
+
+		<div class="jumbotron">
+
+			<div class="row">
+
+				<div class="col-sm-12">
+					<h3>GESTION DE CLIENTES</h3>
+				</div>
+
+				<div class="col-sm-4">
+					<select class="form-control" id="clientSelect"
+						data-bind="value: clienteID, 
+							options: clientesList, 
+							optionsText: function(item) {
+						           return (item.firstname + ' ' + item.lastname);
+						    },
+							optionsValue: 'id'">
+					</select>
+				</div>
+
+				<div class="col-sm-2">
+					<button class="btn btn-primary btn-block"
+						data-bind="click: clientChanged">Seleccionar</button>
+				</div>
+
+				<div class="col-sm-2">
+					<button class="btn btn-success btn-block"
+						data-bind="click: clientNew">Nuevo Cliente</button>
+				</div>
+
+				<div class="col-sm-12">
+					<br>
+				</div>
+
+				<!-- ko if: client -->
+				<div class="col-sm-12">
+
+					<div class="card">
+						<div class="card-header">
+							<h5 class="card-title">Informaci&oacute;n de Cliente</h5>
+						</div>
+						<div class="card-body small">
+							<dl>
+								<dt data-bind="attr: { hidden: editando() }">#ID</dt>
+								<dd>
+<!-- 									<input type="number" min="1" class="form-control" placeholder="Nro Identificador" data-bind="value: client().id, attr: { readonly: (!editando() || client().idOld > 0 ) }"> -->
+										<input type="number" min="1" class="form-control input-sm" placeholder="Nro Identificador" data-bind="value: client().id, attr: { readonly: true, hidden: editando() }" >
+								</dd>
+								<dt>Nombre</dt>
+								<dd>
+									<input type="text" class="form-control input-sm" placeholder="Nombre" data-bind="value: client().firstname, attr: { readonly: !editando() }">
+								</dd>
+								<dt>Apellido</dt>
+								<dd>
+									<input type="text" class="form-control input-sm" placeholder="Apellido" data-bind="value: client().lastname, attr: { readonly: !editando() }">
+								</dd>
+								<dt>CUIT</dt>
+								<dd>
+									<input type="text" class="form-control input-sm" placeholder="CUIT" data-bind="value: client().cuil, attr: { readonly: !editando() }">
+								</dd>
+								<dt>Telefono</dt>
+								<dd>
+									<input type="text" class="form-control input-sm" placeholder="Telefono" data-bind="value: client().phone, attr: { readonly: !editando() }">
+								</dd>
+								<dt>Correo Electronico</dt>
+								<dd>
+									<input type="text" class="form-control input-sm" placeholder="Correo Electronico" data-bind="value: client().email, attr: { readonly: !editando() }">
+								</dd>
+							</dl>
+							
+							<a href="#" class="btn btn-secondary" data-bind="click: clientEdit, visible: editando() == false">Editar</a>
+							<a href="#" class="btn btn-success" data-bind="click: clientGuardar, visible: editando() == true">Guardar</a>
+							<a href="#" class="btn btn-danger" data-bind="click: clientRevert, visible: editando() == true">Cancelar</a>
+							
+						</div>
+					</div>
+
+				</div>
+
+				<div class="col-sm-12">
+					<br>
+				</div>
+				
+				<!-- ko if: (client && client().id != "" && client().id > 0) -->
+				<div class="col-sm-12">
+
+					<div class="card">
+						<div class="card-header">
+							<h5 class="card-title">
+								Licencias del Cliente
+								<button class="btn btn-success btn-sm"
+									data-bind="click: licenciaNew">Nueva Licencia</button>
+							</h5>
+						</div>
+						<div class="card-body">
+							
+							<!-- ko if: licenciaUpd -->
+							<div class="row">
+							
+								<div class="col-6">
+									<div class="form-group">
+								      <label for="companyID"><strong>Empresa ID</strong></label>
+								      <input data-bind="value: licenciaUpd().companyId" type="number" class="form-control" id="companyID" placeholder="Empresa ID" />
+								    </div>
+								</div>
+								<div class="col-6">
+									<div class="form-group">
+								      <label for="companyName"><strong>Nombre Empresa</strong></label>
+								      <input data-bind="value: licenciaUpd().companyName" type="text" class="form-control" id="companyName" placeholder="Nombre Empresa" />
+								    </div>
+								</div>
+								<div class="col-6">
+									<div class="form-group">
+								      <label for="description"><strong>Descripci&oacute;n</strong></label>
+								      <input data-bind="value: licenciaUpd().description" type="text" class="form-control" id="description" placeholder="Descripcion" />
+								    </div>
+								</div>
+								<div class="col-6">
+									<div class="form-group">
+								      <label for=initialActivity><strong>Inicio de Actividades</strong></label>
+								      <input data-bind="value: moment(licenciaUpd().initialActivity).format('YYYY-MM-DD')" type="date" class="form-control" id="initialActivity" placeholder="inicio actividades" />
+								    </div>
+								</div>
+								<div class="col-6">
+									<div class="form-check">
+										<input class="form-check-input" style="margin-left: 10px;" type="checkbox" id="prePayment" data-bind="checked: licenciaUpd().prePayment" placeholder="Pago por adelantado" />
+										<label class="form-check-label" style="margin-left: 10px;" for="prePayment">Pago por adelantado</label>
+								    </div>
+								</div>
+								<div class="col-6">
+									<a href="#" class="btn btn-success" data-bind="click: licenciaGuardar">Guardar</a>
+									<a href="#" class="btn btn-danger" data-bind="click: licenciaRevert">Cancelar</a>
+								</div>
+								
+							</div>
+							<!-- /ko -->
+
+							<table style="font-size: 12; margin-top: 20px;"
+								id='gridLicencias'
+								class='table table-striped table-bordered table-condensed table-hover'
+								cellspacing='0' width='100%'>
+								<thead>
+									<tr>
+										<th>Empresa ID</th>
+										<th>Nombre Empresa</th>
+										<th>Tipo</th>
+										<th>Inicio de Actividades</th>
+										<th>Tipo de Pago</th>
+										<th colspan="3"></th>
+									</tr>
+								</thead>
+								<tbody>
+									<!-- ko if: (licenciasList().length > 0) -->
+									<!-- ko foreach: licenciasList -->
+									<tr>
+										<td data-bind="text: companyId"></td>
+										<td data-bind="text: companyName"></td>
+										<td data-bind="text: description"></td>
+										<td data-bind="text: moment(initialActivity).format('DD/MM/YYYY')"></td>
+										<td data-bind="text: (prePayment ? 'ADELANTADO' : 'MES VENCIDO')"></td>
+										<td>
+											<a href="#" data-bind="click: $parent.getPagos"
+											class="btn btn-outline-info btn-block" role="button">Ver Pagos</a>
+										</td>
+										<td>
+											<a href="#" data-bind="click: $parent.editarLicencia"
+											class="btn btn-secondary btn-block" role="button">Editar</a>
+										</td>
+										<td>
+											<a href="#" data-bind="click: $parent.licenciaBloquear"
+											class="btn btn-danger btn-block" role="button">Bloquear</a>
+										</td>
+									</tr>
+									<!-- /ko -->
+									<!-- /ko -->
+									<!-- ko if: (licenciasList().length == 0) -->
+									<tr>
+										<td colspan="6" class="text-center"><strong>No
+												se encontraron Licencias</strong></td>
+									</tr>
+									<!-- /ko -->
+								</tbody>
+							</table>
+						</div>
+					</div>
+
+				</div>
+				<!-- /ko -->
+
+				<div class="col-sm-12">
+					<br>
+				</div>
+
+				<!-- ko if: (companyId() > 0 && licenciasList().length > 0) -->
+				<div class="col-sm-12">
+					<div class="card">
+						<div class="card-header">
+							<h5 class="card-title">
+								Pagos
+								<button class="btn btn-success btn-sm"
+									data-bind="click: pagoNew">Nuevo Pago</button>
+							</h5>
+						</div>
+						<div class="card-body">
+
+							<table style="font-size: 12; margin-top: 20px;"
+								id='gridResultados'
+								class='table table-striped table-bordered table-condensed table-hover'
+								cellspacing='0' width='100%'>
+								<thead>
+									<tr>
+										<th>Fecha Creaci&oacute;n</th>
+										<th>Fecha Vencimiento</th>
+										<th>Fecha Pago</th>
+										<th>Monto ($)</th>
+										<th>Bonificaci&oacute;n ($)</th>
+										<th>Estado</th>
+										<th></th>
+									</tr>
+								</thead>
+								<tbody>
+									<!-- ko if: (pagosList().length > 0) -->
+									<!-- ko foreach: pagosList -->
+									<tr>
+										<td data-bind="text: moment(creationDate).format('DD/MM/YYYY')"></td>
+										<td data-bind="text: moment(expirationDate).format('DD/MM/YYYY')"></td>
+										<td data-bind="text: moment(paymentDate).format('DD/MM/YYYY')"></td>
+										<td data-bind="text: amount"></td>
+										<td data-bind="text: discount"></td>
+										<td data-bind="text: ((!!removeDate) ? ('ANULADO ' + moment(removeDate).format('DD/MM/YYYY hh:mm')) : '')"></td>
+										<td><a href="#" data-bind="click: $parent.editarPago"
+											class="btn btn-secondary btn-block" role="button">Editar</a></td>
+									</tr>
+									<!-- /ko -->
+									<!-- /ko -->
+									<!-- ko if: (pagosList().length == 0) -->
+									<tr>
+										<td colspan="6" class="text-center"><strong>No
+												se encontraron pagos</strong></td>
+									</tr>
+									<!-- /ko -->
+								</tbody>
+							</table>
+
+						</div>
+						</div>
+					</div>
+
+					<!-- /ko -->
+
+					<!-- /ko -->
+				
+			</div>
+
+		</div>
+	</div>
+
+	<th:block th:include="shared/footer :: footer"></th:block>
+	<script type="text/javascript" src="/clientmanager/js/vm/vm.home.js"></script>
+	<script th:inline="javascript">
+		/*<![CDATA[*/
+		VMHome();
+		/*]]>*/
+	</script>
+
+	<!--/*/ <th:block th:include="shared/footer :: footer"></th:block> /*/-->
 </body>
 </html>

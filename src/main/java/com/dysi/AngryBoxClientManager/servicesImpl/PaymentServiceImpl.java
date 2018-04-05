@@ -1,5 +1,8 @@
 package com.dysi.AngryBoxClientManager.servicesImpl;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +20,7 @@ public class PaymentServiceImpl implements PaymentService {
 
 	@Override
 	public LicensePaymentsPaginationDTO getLicensePaymentsPaginated(License license, int pageSize, int pageNumber) {
+		
 		LicensePaymentsPaginationDTO lppDTO = new LicensePaymentsPaginationDTO();
 		PageRequest request = new PageRequest(pageNumber - 1, pageSize);
 		Page<Payment> paymentsPage = this.paymentRepository.findPaymentsPaginatedByLicense(license.getId(), request);
@@ -28,6 +32,14 @@ public class PaymentServiceImpl implements PaymentService {
 		lppDTO.setPayments(paymentsPage);
 		
 		return lppDTO;
+	}
+	
+	@Override
+	public List<Payment> getLicensePayments(long clientID, long companyID) {
+
+		List<Payment> paymentsPage = this.paymentRepository.findPaymentsPaginatedByLicense(companyID, clientID);
+		
+		return (paymentsPage != null ? paymentsPage : new ArrayList<Payment>());
 	}
 
 }

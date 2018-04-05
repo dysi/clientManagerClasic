@@ -1,7 +1,5 @@
 package com.dysi.AngryBoxClientManager.dtos;
 
-import com.dysi.AngryBoxClientManager.models.Authority;
-
 import java.util.List;
 
 public class UserCreateDTO {

@@ -25,10 +25,10 @@ public class License {
     @ManyToOne
     private Client client;
 
-    @OneToMany(mappedBy = "license")
+    @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
     List<Payment> paymentList;
 
-    @OneToMany(mappedBy = "license")
+    @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
     List<LicenseStatus> licenseStatuses;
 
     public Long getId() {

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import com.dysi.AngryBoxClientManager.models.Payment;
 
 public class LicensePaymentsPaginationDTO {
+	
 	private Long licenseId;
 	private String description;
 	private String companyName;
