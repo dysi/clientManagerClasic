@@ -20,10 +20,14 @@ public class Payment {
     private Calendar creationDate;
     //fecha de pago
     private Calendar paymentDate;
+  //fecha en que se pago
+    private Calendar paymentRealDate;
     // fecha de vencimiento
     private Calendar expirationDate;
     // importe
     private Double amount;
+    //observacion
+    private String observation;
 
     @ManyToOne
     private License license;
@@ -92,4 +96,21 @@ public class Payment {
     public void setLicense(License license) {
         this.license = license;
     }
+
+	public Calendar getPaymentRealDate() {
+		return paymentRealDate;
+	}
+
+	public void setPaymentRealDate(Calendar paymentRealDate) {
+		this.paymentRealDate = paymentRealDate;
+	}
+
+	public String getObservation() {
+		return observation;
+	}
+
+	public void setObservation(String observation) {
+		this.observation = observation;
+	}
+	
 }

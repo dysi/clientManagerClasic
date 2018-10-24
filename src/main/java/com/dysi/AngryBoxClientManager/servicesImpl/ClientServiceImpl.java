@@ -7,6 +7,7 @@ import com.dysi.AngryBoxClientManager.repositories.ClientRepository;
 import com.dysi.AngryBoxClientManager.repositories.UserRepository;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,7 @@ public class ClientServiceImpl implements ClientService{
 	@Override
 	public List<Client> getClients() {
 		List<Client> clients = this.clientRepository.findAll();
-		return clients;
+		return (clients != null ? clients : new ArrayList<Client>());
 	}
 
 	@Override
@@ -63,5 +64,11 @@ public class ClientServiceImpl implements ClientService{
 		cliente = this.clientRepository.saveAndFlush(cliente);
 		
 		return "1|Cliente Creado Exitosamente";
+	}
+
+	@Override
+	public List<ClientDTO> getClientsDTO() {
+		List<ClientDTO> clients = this.clientRepository.findAllDTO();
+		return (clients != null ? clients : new ArrayList<ClientDTO>());
 	}
 }

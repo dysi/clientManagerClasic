@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.dysi.AngryBoxClientManager.dtos.LicenseDTO;
 import com.dysi.AngryBoxClientManager.dtos.LicensePaymentsPaginationDTO;
+import com.dysi.AngryBoxClientManager.dtos.PaymentDTO;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.License;
 import com.dysi.AngryBoxClientManager.models.Payment;
@@ -65,13 +66,25 @@ public class PaymentRestController {
         }
     }
     
-    @RequestMapping("/payments/paymentsByCompany")
+    @RequestMapping("/payments/licenciaBloquear")
+    public ResponseEntity<String> licenciaBloquear(
+    		@RequestParam(value = "licenciaID", required = true) Long licenciaID) {
+    	String resultado = "";
+        try {
+        	resultado = this.licenseService.licenciaBloquear(licenciaID);
+
+            return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (Exception e) {
+        	return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
+        }
+    }
+    
+    @RequestMapping("/payments/paymentsByLicense")
     public ResponseEntity<List<Payment>> getPaymentsPaginatedByCompany(
-            @RequestParam(value = "companyId", required = true) Long companyId,
-            @RequestParam(value = "clientID", required = true) Long clientID) {
+            @RequestParam(value = "licenseId", required = true) Long licenseId) {
         try {
             
-        	List<Payment> payments = this.paymentService.getLicensePayments(clientID, companyId);
+        	List<Payment> payments = this.paymentService.getLicensePayments(licenseId);
 
             return new ResponseEntity<List<Payment>>(payments, HttpStatus.OK);
         } catch (Exception e) {
@@ -79,8 +92,8 @@ public class PaymentRestController {
         }
     }
     
-    @RequestMapping(value = "/payments/edit", method = RequestMethod.POST)
-    public ResponseEntity<String> editLicencia(
+    @RequestMapping(value = "/payments/paymentEdit", method = RequestMethod.POST)
+    public ResponseEntity<String> paymentEdit(
     		@RequestBody LicenseDTO license) {
         try {
         	
@@ -89,6 +102,32 @@ public class PaymentRestController {
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
+        }
+    }
+    
+    @RequestMapping(value = "/payments/licenseEdit", method = RequestMethod.POST)
+    public ResponseEntity<String> licenseEdit(
+    		@RequestBody PaymentDTO Payment) {
+        try {
+        	
+        	String resultado = this.paymentService.editPayment(Payment);
+
+            return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
+        }
+    }
+    
+    @RequestMapping("/payments/bajaPago")
+    public ResponseEntity<String> bajaPago(
+    		@RequestParam(value = "pagoID", required = true) Long pagoID) {
+    	String resultado = "";
+        try {
+        	resultado = this.paymentService.pagoBaja(pagoID);
+
+            return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (Exception e) {
+        	return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
     }
 }

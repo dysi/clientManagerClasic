@@ -23,11 +23,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 	@Query("select p "
 			+ " from Payment p"
 			+ " inner join p.license l"
-			+ " inner join l.client c"
-			+ " where l.companyId = :companyId"
-			+ " and c.id = :clientID"
+			+ " where l.id = :licenseId"
 			+ " order by p.creationDate asc")
 	List<Payment> findPaymentsPaginatedByLicense(
-			@Param("companyId") long companyId,
-			@Param("clientID") long clientID);
+			@Param("licenseId") long licenseId);
 }

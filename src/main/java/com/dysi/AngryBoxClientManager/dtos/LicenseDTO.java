@@ -9,8 +9,9 @@ public class LicenseDTO {
     private String companyName;
     private Long companyId;
     // inicio de actividad
-    //private Timestamp initialActivity;
     private Calendar initialActivity;
+    // fecha de Bloqueo
+    private Calendar lockDate;
     // pago por adelantado
     private boolean prePayment;
     
@@ -57,6 +58,12 @@ public class LicenseDTO {
 	}
 	public void setClienteId(Long clienteId) {
 		this.clienteId = clienteId;
-	}   
-
+	}
+	public Calendar getLockDate() {
+		return lockDate;
+	}
+	public void setLockDate(Calendar lockDate) {
+		this.lockDate = lockDate;
+	}
+	
 }

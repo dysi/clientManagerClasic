@@ -53,6 +53,15 @@ public class LicenseServiceImpl implements LicenseService {
 		if(edicion){
 			//EDICION Y ID CLIENTE SE MANTIENE
 			licenseEdit = this.licenseRepository.findOne(licDTO.getId());
+			LicenseStatus licenciaBase = licenseEdit.getLicenseStatuses().get(0);
+			if(licDTO.getLockDate() != null){
+				licenciaBase.setLockDate(licDTO.getLockDate());
+			} else {
+				Calendar lockDate = Calendar.getInstance();
+				// number of days to add
+				lockDate.add(Calendar.DATE, 90);
+				licenciaBase.setLockDate(lockDate);
+			}
 		} else {
 			//NUEVO
 			List<License> companyExiste = this.licenseRepository.findLicensesByCompanyId(licDTO.getCompanyId());
@@ -94,20 +103,38 @@ public class LicenseServiceImpl implements LicenseService {
 			licenciaBase.setForcedLock(false);
 			licenciaBase.setLimitTransaction(9999999l);
 			
-			Calendar lockDate = Calendar.getInstance();
-			// number of days to add
-			lockDate.add(Calendar.DATE, 90);
-			licenciaBase.setLockDate(lockDate);
-			
 			licenciaBase.setObservation("");
+			if(licDTO.getLockDate() != null){
+				licenciaBase.setLockDate(licDTO.getLockDate());
+			} else {
+				Calendar lockDate = Calendar.getInstance();
+				// number of days to add
+				lockDate.add(Calendar.DATE, 90);
+				licenciaBase.setLockDate(lockDate);
+			}
 			
 			licenseStatuses.add(licenciaBase);
 			
 			licenseEdit.setLicenseStatuses(licenseStatuses);
 			
 			this.licenseRepository.save(licenseEdit);
+		} 
+		
+		return "1|Licencia " + (edicion ? "Editada" : "Creada") + " Exitosamente";
+	}
+
+	@Override
+	public String licenciaBloquear(Long licenciaID) {
+		License licenseEdit = this.licenseRepository.findOne(licenciaID);
+		if(licenseEdit == null){
+			return ("99|EL ID DE LA LICENCIA NO EXISTE: #" + licenciaID);
 		}
 		
-		return "1|Licencia Creada Exitosamente";
+		List<LicenseStatus> estados = licenseEdit.getLicenseStatuses();
+		estados.get(0).setForcedLock(!estados.get(0).isForcedLock());
+		
+		this.licenseRepository.save(licenseEdit);
+		
+		return "1|Licencia #" + licenciaID + " Cambio de Estado";
 	}
 }

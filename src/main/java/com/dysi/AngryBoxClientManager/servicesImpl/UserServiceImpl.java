@@ -2,9 +2,11 @@ package com.dysi.AngryBoxClientManager.servicesImpl;
 
 import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
 import com.dysi.AngryBoxClientManager.models.Authority;
+import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.repositories.AuthorityRepository;
 import com.dysi.AngryBoxClientManager.repositories.UserRepository;
+import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,6 +25,8 @@ public class UserServiceImpl implements UserService {
     private AuthorityRepository authorityRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private ClientService clientService;
 
     @Override
     public UserCreateDTO getUserCreateDTOById(long id) {
@@ -32,7 +36,7 @@ public class UserServiceImpl implements UserService {
         UserCreateDTO uDTO = new UserCreateDTO();
         uDTO.setId(u.getId());
         uDTO.setUsername(u.getUsername());
-        uDTO.setPassword((u.getPassword()));
+        //uDTO.setPassword((u.getPassword()));
         uDTO.setFirstname(u.getFirstname());
         uDTO.setLastname(u.getLastname());
         uDTO.setEmail(u.getEmail());
@@ -44,6 +48,9 @@ public class UserServiceImpl implements UserService {
         }
 
         uDTO.setAuthorities(authorities);
+        
+        //Client client = this.clientService.getClientFromUser(u.getUsername());
+        uDTO.setClientID(u.getClient() != null ? u.getClient().getId() : null);
 
         return uDTO;
 
@@ -67,6 +74,12 @@ public class UserServiceImpl implements UserService {
         nu.setLastPasswordResetDate(new Date());
         nu.setAuthorities(this.getAuthorityList(user.getAuthorities()));
 
+        if(user.getClientID() != null && user.getClientID().longValue() > 0){
+        	nu.setClient(clientService.getClientByID(user.getClientID()));
+        } else {
+        	nu.setClient(null);
+        }
+        
         return this.userRepository.saveAndFlush(nu);
     }
 
@@ -79,8 +92,14 @@ public class UserServiceImpl implements UserService {
         nu.setLastname(user.getLastname());
         nu.setEmail(user.getEmail());
         nu.setEnabled(user.getEnabled());
-        //nu.setPassword(passwordEncoder.encode(user.getPassword()));
+        nu.setPassword(passwordEncoder.encode(user.getPassword()));
         nu.setAuthorities(this.getAuthorityList(user.getAuthorities()));
+        
+        if(user.getClientID() != null && user.getClientID().longValue() > 0){
+        	nu.setClient(clientService.getClientByID(user.getClientID()));
+        } else {
+        	nu.setClient(null);
+        }
 
         return this.userRepository.saveAndFlush(nu);
     }

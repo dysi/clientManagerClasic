@@ -13,4 +13,6 @@ public interface LicenseService {
 
 	public String editLicencia(LicenseDTO license);
 
+	public String licenciaBloquear(Long licenciaID);
+
 }

@@ -2,6 +2,20 @@ package com.dysi.AngryBoxClientManager.dtos;
 
 public class ClientDTO {
 	
+	public ClientDTO(Long id, String firstname, String lastname, String email, String phone, String cuil) {
+		super();
+		this.id = id;
+		this.firstname = firstname;
+		this.lastname = lastname;
+		this.email = email;
+		this.phone = phone;
+		this.cuil = cuil;
+	}
+	
+	public ClientDTO() {
+		super();
+	}
+	
 	private Long id;
 	
 	private Long idOld;

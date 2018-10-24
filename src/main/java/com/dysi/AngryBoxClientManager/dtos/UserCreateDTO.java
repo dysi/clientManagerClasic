@@ -11,6 +11,8 @@ public class UserCreateDTO {
     private String email;
     private Boolean enabled;
     private List<Long> authorities;
+    
+    private Long clientID;
 
     public UserCreateDTO() {
     }
@@ -78,4 +80,13 @@ public class UserCreateDTO {
     public void setAuthorities(List<Long> authorities) {
         this.authorities = authorities;
     }
+
+	public Long getClientID() {
+		return clientID;
+	}
+
+	public void setClientID(Long clientID) {
+		this.clientID = clientID;
+	}
+    
 }

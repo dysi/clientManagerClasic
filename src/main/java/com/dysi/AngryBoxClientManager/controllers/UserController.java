@@ -1,7 +1,12 @@
 package com.dysi.AngryBoxClientManager.controllers;
 
+import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
 import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
+import com.dysi.AngryBoxClientManager.models.Client;
+import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.UserService;
+
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +23,8 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    @Autowired
+    private ClientService clientService;
     
     @Value("${server.port}")
     private int port;
@@ -37,7 +44,12 @@ public class UserController {
 
         UserCreateDTO user = userCreateDTO != null ? userCreateDTO : new UserCreateDTO();
         model.addAttribute("user", user);
+        
+        List<ClientDTO> clientesList = this.clientService.getClientsDTO();
+        
+        model.addAttribute("clientesList", clientesList);
         model.addAttribute("authoritiesList", userService.getAuthorities());
+        
         return "users/user-form";
         
     }
@@ -46,7 +58,12 @@ public class UserController {
     public String getEditUserPage(Model model, @PathVariable(value = "id") long id) {
 
         model.addAttribute("user", userService.getUserCreateDTOById(id));
+        
+        List<ClientDTO> clientesList = this.clientService.getClientsDTO();
+        
+        model.addAttribute("clientesList", clientesList);
         model.addAttribute("authoritiesList", userService.getAuthorities());
+        
         return "users/user-form";
         
     }

@@ -10,4 +10,5 @@ public interface ClientService {
 	public List<Client> getClients();
 	public Client getClientByID(Long clientID);
 	public String editClient(ClientDTO clientEdit);
+	public List<ClientDTO> getClientsDTO();
 }
