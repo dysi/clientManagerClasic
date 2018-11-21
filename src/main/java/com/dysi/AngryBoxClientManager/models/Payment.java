@@ -6,30 +6,48 @@ import javax.persistence.*;
 import java.util.Calendar;
 
 @Entity
+@Table(name = "PAYMENT")
 public class Payment {
+	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
     // descuento
+    @Column(name = "DISCOUNT")
     private Double discount;
+    
     // fecha de baja
+    @Column(name = "REMOVEDATE")
     private Calendar removeDate;
+    
     // fecha de creacion
+    @Column(name = "CREATIONDATE")
     private Calendar creationDate;
+    
     //fecha de pago
+    @Column(name = "PAYMENTDATE")
     private Calendar paymentDate;
-  //fecha en que se pago
+    
+ 	//fecha en que se pago
+    @Column(name = "PAYMENTREALDATE")
     private Calendar paymentRealDate;
+    
     // fecha de vencimiento
+    @Column(name = "EXPIRATIONDATE")
     private Calendar expirationDate;
+    
     // importe
+    @Column(name = "AMOUNT")
     private Double amount;
+    
     //observacion
+    @Column(name = "OBSERVATION")
     private String observation;
 
     @ManyToOne
+    @Column(name = "LICENSE")
     private License license;
 
     public Long getId() {

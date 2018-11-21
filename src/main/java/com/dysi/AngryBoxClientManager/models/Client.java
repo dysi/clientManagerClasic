@@ -7,22 +7,35 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
 
 @Entity
+@Table(name = "CLIENT")
 public class Client {
+	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
+    @Column(name = "FIRSTNAME")
     private String firstname;
+    
+    @Column(name = "LASTNAME")
     private String lastname;
+    
+    @Column(name = "EMAIL")
     private String email;
+    
+    @Column(name = "PHONE")
     private String phone;
+    
+    @Column(name = "CUIL")
     private String cuil;
 
     @OneToOne
+    @Column(name = "USER")
     private User user;
 
     @OneToMany(mappedBy = "client")
+    @Column(name = "LICENSES")
     private List<License> licenses;
 
     public Long getId() {

@@ -7,28 +7,41 @@ import java.util.Calendar;
 import java.util.List;
 
 @Entity
+@Table(name = "LICENSE")
 public class License {
+	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
+    
+    @Column(name = "DESCRIPTION")
     private String description;
 
+    @Column(name = "COMPANYNAME")
     private String companyName;
+    
+    @Column(name = "COMPANYID")
     private Long companyId;
 
     // inicio de actividad
+    @Column(name = "INITIALACTIVITY")
     private Calendar initialActivity;
+    
     // pago por adelantado
+    @Column(name = "PREPAYMENT")
     private boolean prePayment;
 
     @ManyToOne
+    @Column(name = "CLIENT")
     private Client client;
 
     @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
+    @Column(name = "PAYMENTLIST")
     List<Payment> paymentList;
 
     @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
+    @Column(name = "LICENSESTATUSES")
     List<LicenseStatus> licenseStatuses;
 
     public Long getId() {

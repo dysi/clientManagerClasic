@@ -6,24 +6,38 @@ import javax.persistence.*;
 import java.util.Calendar;
 
 @Entity
+@Table(name = "LICENSESTATUS")
 public class LicenseStatus {
+	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
     // fecha baja
+    @Column(name = "REMOVEDATE")
     private Calendar removeDate;
+    
     // fecha cracion
+    @Column(name = "CREATIONDATE")
     private Calendar creationDate;
+    
+    @Column(name = "OBSERVATION")
     private String observation;
+    
+    @Column(name = "LIMITTRANSACTION")
     private Long limitTransaction;
+    
     // blockeo forzado
+    @Column(name = "FORCEDLOCK")
     private boolean forcedLock;
+    
     // fecha bloqueo
+    @Column(name = "LOCKDATE")
     private Calendar lockDate;
 
     @ManyToOne
+    @Column(name = "LICENSE")
     private License license;
 
     public Long getId() {
