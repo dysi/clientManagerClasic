@@ -37,7 +37,6 @@ public class LicenseStatus {
     private Calendar lockDate;
 
     @ManyToOne
-    @Column(name = "LICENSE")
     private License license;
 
     public Long getId() {

@@ -33,15 +33,12 @@ public class License {
     private boolean prePayment;
 
     @ManyToOne
-    @Column(name = "CLIENT")
     private Client client;
 
     @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
-    @Column(name = "PAYMENTLIST")
     List<Payment> paymentList;
 
     @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
-    @Column(name = "LICENSESTATUSES")
     List<LicenseStatus> licenseStatuses;
 
     public Long getId() {

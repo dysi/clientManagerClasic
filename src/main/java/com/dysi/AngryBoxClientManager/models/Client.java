@@ -31,11 +31,9 @@ public class Client {
     private String cuil;
 
     @OneToOne
-    @Column(name = "USER")
     private User user;
 
     @OneToMany(mappedBy = "client")
-    @Column(name = "LICENSES")
     private List<License> licenses;
 
     public Long getId() {

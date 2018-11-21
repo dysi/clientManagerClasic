@@ -47,7 +47,6 @@ public class Payment {
     private String observation;
 
     @ManyToOne
-    @Column(name = "LICENSE")
     private License license;
 
     public Long getId() {
