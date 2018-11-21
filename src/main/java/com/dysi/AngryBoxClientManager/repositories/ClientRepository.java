@@ -17,7 +17,9 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 
 
     @Query("select new com.dysi.AngryBoxClientManager.dtos.ClientDTO("
-    		+ " c.id, c.firstname, c.lastname, c.email, c.phone, c.cuil)"
-    		+ " from Client c order by c.firstname asc, c.lastname asc")
+    		+ " c.id, c.firstname, c.lastname, c.email, c.phone, c.cuil, u.username)"
+    		+ " from Client c "
+    		+ " left join c.user u "
+    		+ " order by c.firstname asc, c.lastname asc")
 	public List<ClientDTO> findAllDTO();
 }

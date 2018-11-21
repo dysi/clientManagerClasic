@@ -7,11 +7,12 @@ import com.dysi.AngryBoxClientManager.models.User;
 import java.util.List;
 
 public interface UserService {
+	
     public UserCreateDTO getUserCreateDTOById(long id);
 
     public List<Authority> getAuthorities();
 
-    public User createUser(UserCreateDTO user);
+    public User editUser(UserCreateDTO user) throws Exception;
 
-    public User editUser(UserCreateDTO user);
+	public List<UserCreateDTO> getAllUsersDTO();
 }

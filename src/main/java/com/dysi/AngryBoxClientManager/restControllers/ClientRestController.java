@@ -26,6 +26,12 @@ public class ClientRestController {
     @Autowired
     private LicenseService licenseService;
 
+    /**
+     * COMUNICACION CON ANGRYBOX (Bloqueo de Cuenta)
+     * @param username
+     * @param companyId
+     * @return
+     */
     @RequestMapping("/clients/license")
     public ResponseEntity<License> getLicenseFromClient(
             @RequestParam(value = "username", required = true) String username,
@@ -45,16 +51,16 @@ public class ClientRestController {
     }
     
     @RequestMapping("/clients/getClients")
-    public ResponseEntity<List<Client>> getClients() {
+    public ResponseEntity<List<ClientDTO>> getClients() {
         try {
-            List<Client> client = this.clientService.getClients();
+            List<ClientDTO> client = this.clientService.getClients();
             if (client == null) {
-                return new ResponseEntity<List<Client>>(client, HttpStatus.NOT_FOUND);
+                return new ResponseEntity<List<ClientDTO>>(client, HttpStatus.NOT_FOUND);
             }
 
-            return new ResponseEntity<List<Client>>(client, HttpStatus.OK);
+            return new ResponseEntity<List<ClientDTO>>(client, HttpStatus.OK);
         } catch (Exception e) {
-        	return new ResponseEntity<List<Client>>(HttpStatus.BAD_REQUEST);
+        	return new ResponseEntity<List<ClientDTO>>(HttpStatus.BAD_REQUEST);
         }
     }
     

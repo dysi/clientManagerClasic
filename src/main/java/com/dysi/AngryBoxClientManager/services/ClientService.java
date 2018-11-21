@@ -7,7 +7,7 @@ import com.dysi.AngryBoxClientManager.models.Client;
 
 public interface ClientService {
     public Client getClientFromUser(String username);
-	public List<Client> getClients();
+	public List<ClientDTO> getClients();
 	public Client getClientByID(Long clientID);
 	public String editClient(ClientDTO clientEdit);
 	public List<ClientDTO> getClientsDTO();

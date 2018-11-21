@@ -35,10 +35,13 @@ public class PaymentRestController {
     public ResponseEntity<LicensePaymentsPaginationDTO> getPaymentsPaginated(
             @RequestParam(value = "username", required = true) String username,
             @RequestParam(value = "companyId", required = true) Long companyId,
-            @RequestParam(value = "pageSize", required = true) int pageSize,
-            @RequestParam(value = "pageNumber", required = true) int pageNumber    
-    ) {
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @RequestParam(value = "pageNumber", required = false) Integer pageNumber    
+    		) {
         try {
+        	pageSize = (pageSize == null ? 30 : pageSize);
+        	pageNumber = (pageNumber == null ? 1 : pageNumber);
+        	
             Client client = this.clientService.getClientFromUser(username);
             License license = this.licenseService.getLicenseFromClient(client, companyId);
             LicensePaymentsPaginationDTO lppDTO = this.paymentService.getLicensePaymentsPaginated(license, pageSize, pageNumber);
@@ -49,7 +52,7 @@ public class PaymentRestController {
 
             return new ResponseEntity<LicensePaymentsPaginationDTO>(lppDTO, HttpStatus.OK);
         } catch (Exception e) {
-            return new ResponseEntity<LicensePaymentsPaginationDTO>(HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<LicensePaymentsPaginationDTO>(HttpStatus.FORBIDDEN);
         }
     }
     

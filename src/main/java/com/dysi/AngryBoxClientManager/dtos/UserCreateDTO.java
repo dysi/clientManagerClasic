@@ -3,7 +3,20 @@ package com.dysi.AngryBoxClientManager.dtos;
 import java.util.List;
 
 public class UserCreateDTO {
-    private Long id;
+	
+	public UserCreateDTO() {
+		super();
+	}
+	
+    public UserCreateDTO(Long id, String username, String firstname, String lastname) {
+		super();
+		this.id = id;
+		this.username = username;
+		this.firstname = firstname;
+		this.lastname = lastname;
+	}
+
+	private Long id;
     private String username;
     private String password;
     private String firstname;
@@ -13,9 +26,6 @@ public class UserCreateDTO {
     private List<Long> authorities;
     
     private Long clientID;
-
-    public UserCreateDTO() {
-    }
 
     public Long getId() {
         return id;

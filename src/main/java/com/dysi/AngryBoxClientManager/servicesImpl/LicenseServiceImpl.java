@@ -29,7 +29,7 @@ public class LicenseServiceImpl implements LicenseService {
         License license = null;
 
         for(License l : licenseList){
-            if(l.getCompanyId() == companyId){
+            if(l.getCompanyId().longValue() == companyId){
             	license = l;
                 break;
             }

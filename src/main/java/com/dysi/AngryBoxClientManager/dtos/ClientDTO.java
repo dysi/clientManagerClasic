@@ -2,7 +2,7 @@ package com.dysi.AngryBoxClientManager.dtos;
 
 public class ClientDTO {
 	
-	public ClientDTO(Long id, String firstname, String lastname, String email, String phone, String cuil) {
+	public ClientDTO(Long id, String firstname, String lastname, String email, String phone, String cuil, String username) {
 		super();
 		this.id = id;
 		this.firstname = firstname;
@@ -10,6 +10,7 @@ public class ClientDTO {
 		this.email = email;
 		this.phone = phone;
 		this.cuil = cuil;
+		this.username = (username != null ? username : "SIN ASIGNAR");
 	}
 	
 	public ClientDTO() {
@@ -25,6 +26,8 @@ public class ClientDTO {
     private String email;
     private String phone;
     private String cuil;
+    
+    private String username;
     
 	public Long getId() {
 		return id;
@@ -67,6 +70,14 @@ public class ClientDTO {
 	}
 	public void setCuil(String cuil) {
 		this.cuil = cuil;
+	}
+
+	public String getUsername() {
+		return username;
+	}
+
+	public void setUsername(String username) {
+		this.username = username;
 	}
 	
 }

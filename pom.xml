@@ -4,11 +4,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.dysi</groupId>
-	<artifactId>AngryBoxClientManager</artifactId>
+	<artifactId>clientmanager</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>war</packaging>
 
-	<name>AngryBoxClientManager</name>
+	<name>clientmanager</name>
 	<description>Gestor de cliente y licencias de AngryBox</description>
 
 	<parent>
