@@ -65,6 +65,16 @@ public class FechasHelper {
 
 		return fechaMin;
 	}
+	
+	public static final double getDiferenciaDias(Calendar fechaInicial, Calendar fechaFinal) {
+		if(fechaInicial == null || fechaFinal == null) {
+			return -99999d;
+		}
+		long seconds = (fechaFinal.getTimeInMillis() - fechaInicial.getTimeInMillis()) / 1000;
+		double hours = (seconds / 3600);
+		double dias = (hours / 24);
+		return dias;
+	}
 
 	public static final long getDiferenciaSegundos(Calendar fechaInicial, Calendar fechaFinal) {
 		long seconds = (fechaFinal.getTimeInMillis() - fechaInicial.getTimeInMillis()) / 1000;

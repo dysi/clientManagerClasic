@@ -49,7 +49,9 @@ public class ClientLookup {
 		lockDate = FechasHelper.getStringFromCalendarForSimplePrint(lockDateC);
 		
 		forcedLock = (forcedLock != null ? forcedLock : false);
-		this.block = forcedLock ? "FORZADO" : ((lockDateC != null && lockDateC.getTimeInMillis() <= Calendar.getInstance().getTimeInMillis()) ? "VENCIDA" : "");
+		this.block = (forcedLock ? "FORZADO" : ((lockDateC != null && lockDateC.getTimeInMillis() <= Calendar.getInstance().getTimeInMillis()) ? "VENCIDA" : ""));
+		
+		this.diasBlock = FechasHelper.getDiferenciaDias(Calendar.getInstance(), lockDateC);
 		
 		this.lockDate = lockDate;
 		
@@ -81,6 +83,7 @@ public class ClientLookup {
     private boolean prePayment;
     // BLOQUEADO
     private String block;
+    private double diasBlock;
     
 	public Long getId() {
 		return id;
@@ -173,5 +176,12 @@ public class ClientLookup {
 		this.idOld = idOld;
 	}
 
+	public double getDiasBlock() {
+		return diasBlock;
+	}
+
+	public void setDiasBlock(double diasBlock) {
+		this.diasBlock = diasBlock;
+	}
 	
 }
