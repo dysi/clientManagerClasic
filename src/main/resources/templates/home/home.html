@@ -16,30 +16,45 @@
 			<div class="row">
 
 				<div class="col-12">
-					<h3>GESTION DE CLIENTES</h3>
+					<h3>GESTION DE CLIENTES <button class="btn btn-secondary btn-sm" data-bind="click: initHome">ACTUALIZAR</button></h3>
 				</div>
-
-				<div class="col-4">
-					<select class="form-control" id="clientSelect"
-						data-bind="value: clienteID, 
-							options: clientesList, 
-							optionsText: function(item) {
-						           return (item.firstname + ' ' + item.lastname);
-						    },
-							optionsValue: 'id'">
-					</select>
+				
+				<div class="col-12">
+					<table style="font-size: 12;" id='gridClientes' class='table table-striped table-bordered table-condensed table-hover small' >
+					  <thead>
+					    <tr>
+					      <th scope="col">Nombre</th>
+					      <th scope="col">Usuario</th>
+					      <th scope="col">Licencia</th>
+					      <th scope="col">Estado</th>
+					      <th scope="col">Bloqueo</th>
+					      <th scope="col"><button class="btn btn-success btn-sm btn-block" data-bind="click: clientNew">Nuevo Cliente</button></th>
+					    </tr>
+					  </thead>
+					  <tbody>
+					  	<!-- ko if: (clientesList().length > 0) -->
+							<!-- ko foreach: clientesList -->
+							<tr data-bind="css: (block != null && block != '' ? (block == 'FORZADO' ? 'table-warning' : 'table-danger') : '')">
+						      <th><span data-bind="text: lastname + ' ' + firstname"></span></th>
+						      <th><span data-bind="text: (username != null && username != '' ? username : '')"></span></th>
+						      <td><span data-bind="text: (companyId > 0 ? (companyId + '. ' + companyName) : '') "></span></td>
+						      <td><span data-bind="text: (block != null && block != '' ? block : '')"></span></td>
+						      <td><span data-bind="text: lockDate "></span></td>
+						      <td><button class="btn btn-primary btn-sm btn-block" data-bind="click: $parent.selectClient">Seleccionar</button></td>
+						    </tr>
+							<!-- /ko -->
+						<!-- /ko -->
+						<!-- ko if: (clientesList().length == 0) -->
+						<tr>
+							<td colspan="6" class="text-center">
+								<strong>No se encontraron Clientes</strong>
+							</td>
+						</tr>
+						<!-- /ko -->					    
+					  </tbody>
+					</table>
 				</div>
-
-				<div class="col-2">
-					<button class="btn btn-primary btn-block"
-						data-bind="click: clientChanged">Seleccionar</button>
-				</div>
-
-				<div class="col-2">
-					<button class="btn btn-success btn-block"
-						data-bind="click: clientNew">Nuevo Cliente</button>
-				</div>
-
+				
 				<div class="col-12">
 					<br>
 				</div>

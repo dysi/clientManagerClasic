@@ -36,7 +36,7 @@ function VMHome() {
 			$.ajax
 			({
 			  type: "GET",
-			  url: "../api/clients/getClients",
+			  url: "../api/clients/getClientsLookups",
 			  dataType: 'json',
 			  async: false,
 			  headers: {
@@ -67,6 +67,30 @@ function VMHome() {
 			
 			$.each(vm.clientesList(), function( index, client ) {
 			  if(client.id == vm.clienteID()){
+				  client.idOld = client.id;
+				  vm.client(client);
+				  vm.getLicencias();
+				  
+				  vm.client.valueHasMutated();
+				  return;
+			  }
+			});
+		};
+		
+		vm.selectClient = function(data) {
+			vm.editando(false);
+			vm.client(null);
+			vm.licenciaUpd(null);
+			
+			vm.pagoUpd(null);
+			
+			var listPagosAux = vm.pagosList();
+			listPagosAux.length = 0;
+			vm.pagosList.valueHasMutated();
+			vm.clienteID(data.id);
+			
+			$.each(vm.clientesList(), function( index, client ) {
+			  if(client.id == data.id){
 				  client.idOld = client.id;
 				  vm.client(client);
 				  vm.getLicencias();

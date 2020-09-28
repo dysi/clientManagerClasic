@@ -1,6 +1,7 @@
 package com.dysi.AngryBoxClientManager.restControllers;
 
 import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
+import com.dysi.AngryBoxClientManager.dtos.ClientLookup;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.License;
 import com.dysi.AngryBoxClientManager.services.ClientService;
@@ -60,7 +61,21 @@ public class ClientRestController {
 
             return new ResponseEntity<List<ClientDTO>>(client, HttpStatus.OK);
         } catch (Exception e) {
-        	return new ResponseEntity<List<ClientDTO>>(HttpStatus.BAD_REQUEST);
+        	return new ResponseEntity<List<ClientDTO>>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    @RequestMapping("/clients/getClientsLookups")
+    public ResponseEntity<List<ClientLookup>> getClientsLookups() {
+        try {
+            List<ClientLookup> client = this.clientService.getClientsLookups();
+            if (client == null) {
+                return new ResponseEntity<List<ClientLookup>>(client, HttpStatus.NOT_FOUND);
+            }
+
+            return new ResponseEntity<List<ClientLookup>>(client, HttpStatus.OK);
+        } catch (Exception e) {
+        	return new ResponseEntity<List<ClientLookup>>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     
