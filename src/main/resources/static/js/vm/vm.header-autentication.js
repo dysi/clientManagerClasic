@@ -4,7 +4,7 @@ if (isLoginPage) {
 		localStorage.removeItem('token');
 	}
 } else {
-	if (localStorage.getItem('token')) {
+	if (localStorage.getItem('token') != null) {
 		
 	} else {
 		window.location.href = "../users/login";

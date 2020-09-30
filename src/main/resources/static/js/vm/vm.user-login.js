@@ -31,7 +31,6 @@ function VMUserLogin(msg, port) {
 		// var
 		vm.isLoading = ko.observable(false);
 		vm.errorAlertMsg = ko.observable("");
-		// vm.renderHome = renderHome;
 
 		// Methods
 		vm.onSubmit = login;

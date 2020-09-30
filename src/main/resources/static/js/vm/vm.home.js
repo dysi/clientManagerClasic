@@ -44,11 +44,13 @@ function VMHome() {
 			  },
 			  success: function (data){
 				if(!!data){
+					
 	        		vm.clientesList(data);
 	        	}
 			  },
 			  error: function (error){
 				  console.log("vm.initHome ERROR: " + error);
+				  window.location.replace("/clientmanager/users/login");
 			  }
 			});
 			
@@ -243,7 +245,7 @@ function VMHome() {
 							
 							vm.clientChanged();
 							
-							// console.log(dataSplit[1]);
+							vm.initHome();
 							
 						} else {
 							console.log("ERROR: " + dataSplit[1]);
@@ -271,7 +273,7 @@ function VMHome() {
 						
 						vm.clientChanged();
 						
-						// console.log(dataSplit[1]);
+						vm.initHome();
 						
 					} else {
 						console.log("ERROR: " + dataSplit[1]);

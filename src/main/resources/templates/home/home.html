@@ -9,12 +9,12 @@
 <body>
 	<nav th:replace="shared/navbar :: navbar"></nav>
 
-	<div id="container.home" class="container">
+	<div class="container mt-3" id="container.home" >
 
 		<div class="row">
 
 			<div class="col-12">
-				<h3>GESTION DE CLIENTES <button class="btn btn-secondary btn-sm" data-bind="click: initHome">ACTUALIZAR</button></h3>
+				<h3>GESTION DE CLIENTES <button role="button" class="btn btn-secondary btn-sm ml-2" data-bind="click: initHome"><strong>ACTUALIZAR</strong></button></h3>
 			</div>
 			
 			<div class="col-12">
@@ -25,14 +25,14 @@
 				      <th scope="col">Usuario</th>
 				      <th scope="col">Licencia</th>
 				      <th scope="col">Estado</th>
-				      <th scope="col">Bloqueo</th>
+				      <th scope="col">Fecha Bloqueo</th>
 				      <th scope="col"><button class="btn btn-success btn-sm btn-block" data-bind="click: clientNew">Nuevo Cliente</button></th>
 				    </tr>
 				  </thead>
 				  <tbody>
 				  	<!-- ko if: (clientesList().length > 0) -->
 						<!-- ko foreach: clientesList -->
-						<tr data-bind="css: (block != null && block != '' ? (block == 'FORZADO' ? 'table-warning' : 'table-danger') : '')">
+						<tr data-bind="css: (block != null && block != '' ? (block == 'VENCIDA' ? 'table-warning' : 'table-danger') : '')">
 					      <th><span data-bind="text: lastname + ' ' + firstname"></span></th>
 					      <th><span data-bind="text: (username != null && username != '' ? username : '')"></span></th>
 					      <td><span data-bind="text: (companyId > 0 ? (companyId + '. ' + companyName) : '') "></span></td>

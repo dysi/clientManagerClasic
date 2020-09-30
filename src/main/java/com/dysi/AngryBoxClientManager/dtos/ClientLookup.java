@@ -49,7 +49,7 @@ public class ClientLookup {
 		lockDate = FechasHelper.getStringFromCalendarForSimplePrint(lockDateC);
 		
 		forcedLock = (forcedLock != null ? forcedLock : false);
-		this.block = (forcedLock ? "FORZADO" : ((lockDateC != null && lockDateC.getTimeInMillis() <= Calendar.getInstance().getTimeInMillis()) ? "VENCIDA" : ""));
+		this.block = (forcedLock ? "BLOQUEADO" : ((lockDateC != null && lockDateC.getTimeInMillis() <= Calendar.getInstance().getTimeInMillis()) ? "VENCIDA" : ""));
 		
 		this.diasBlock = FechasHelper.getDiferenciaDias(Calendar.getInstance(), lockDateC);
 		

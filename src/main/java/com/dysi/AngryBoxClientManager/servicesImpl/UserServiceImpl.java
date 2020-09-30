@@ -1,6 +1,5 @@
 package com.dysi.AngryBoxClientManager.servicesImpl;
 
-import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
 import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
 import com.dysi.AngryBoxClientManager.models.Authority;
 import com.dysi.AngryBoxClientManager.models.Client;
@@ -8,14 +7,12 @@ import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.repositories.AuthorityRepository;
 import com.dysi.AngryBoxClientManager.repositories.ClientRepository;
 import com.dysi.AngryBoxClientManager.repositories.UserRepository;
-import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Service
@@ -68,14 +65,23 @@ public class UserServiceImpl implements UserService {
 	public User editUser(UserCreateDTO user) throws Exception {
 
 		try {
+			
+			if(user.getUsername() == null || user.getUsername().trim().length() == 0) {
+				throw new Exception("Nombre de usuario invalido");
+			}
+			
 			Client clientUpdate = null;
 
 			User nu = new User();
 			if (user.getId() != null && user.getId().longValue() > 0) {
 				nu = this.userRepository.findOne(user.getId());
+			} else {
+				List<User> exist = this.userRepository.existUser(user.getUsername());
+				if(exist != null && exist.size() > 0) {
+					throw new Exception("Usuario ya existe");
+				}
+				nu.setUsername(user.getUsername());
 			}
-
-			nu.setUsername(user.getUsername());
 
 			nu.setFirstname(user.getFirstname());
 			nu.setLastname(user.getLastname());
@@ -105,7 +111,7 @@ public class UserServiceImpl implements UserService {
 
 			return nu;
 		} catch (Exception e) {
-			throw new Exception("ERROR editUser: " + e.getMessage());
+			throw new Exception("2|ERROR: " + e.getMessage());
 		}
 	}
 

@@ -2,7 +2,6 @@ package com.dysi.AngryBoxClientManager.controllers;
 
 import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
 import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
-import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.UserService;
@@ -61,7 +60,8 @@ public class UserController {
     @RequestMapping("/create/{id}")
     public String getEditUserPage(Model model, @PathVariable(value = "id") long id) {
 
-        model.addAttribute("user", userService.getUserCreateDTOById(id));
+    	UserCreateDTO user = userService.getUserCreateDTOById(id);
+        model.addAttribute("user", user);
         
         List<UserCreateDTO> usuariosList = this.userService.getAllUsersDTO();
         
@@ -81,39 +81,14 @@ public class UserController {
      * @param userCreateDTO
      * @return
      */
-    @RequestMapping(value = "/create", method = RequestMethod.POST)
-    public String updateUser(Model model, 
-    		@ModelAttribute(value = "user") UserCreateDTO userCreateDTO) {
-
-        try {
-        	
-        	User userEdit = userService.editUser(userCreateDTO);
-            
-            return this.getEditUserPage(model, userEdit.getId());
-
-        } catch (Exception e) {
-        	System.out.println("Error: UserController - /updateUser " + e.getMessage());
-            return this.getCreateUserPage(model, userCreateDTO);
-        }
-    }
-
-    /**
-     * Metodo para cambiar el usuario a editar desde el SELECT
-     * @param model
-     * @param userCreateDTO
-     * @return
-     */
     @RequestMapping(value = "/edit", method = RequestMethod.POST)
-    public String changeForEdit(Model model, 
-    		@ModelAttribute(value = "user") UserCreateDTO userCreateDTO) {
-
+    public String changeForEdit(Model model,  @ModelAttribute(value = "user") UserCreateDTO userCreateDTO) {
         try {
-            
             return this.getEditUserPage(model, userCreateDTO.getId());
-
         } catch (Exception e) {
         	System.out.println("Error: UserController - /changeForEdit " + e.getMessage());
             return this.getCreateUserPage(model, userCreateDTO);
         }
     }
+    
 }
