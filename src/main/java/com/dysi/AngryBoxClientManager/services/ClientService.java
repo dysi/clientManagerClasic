@@ -12,5 +12,5 @@ public interface ClientService {
 	public Client getClientByID(Long clientID);
 	public String editClient(ClientDTO clientEdit);
 	public List<ClientDTO> getClientsDTO();
-	public List<ClientLookup> getClientsLookups();
+	public List<ClientLookup> getClientsLookups(String keyword, Integer statusId, Integer daysToLock);
 }

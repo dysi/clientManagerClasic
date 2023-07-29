@@ -74,14 +74,18 @@ public class ClientRestController {
     
     @RequestMapping("/clients/getClientsLookups")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<List<ClientLookup>> getClientsLookups() {
+    public ResponseEntity<List<ClientLookup>> getClientsLookups(
+    		@RequestParam(value = "keyword", required = false) String keyword,
+    		@RequestParam(value = "statusId", required = false) Integer statusId,
+    		@RequestParam(value = "daysToLock", required = false) Integer daysToLock
+    		) {
         try {
-            List<ClientLookup> client = this.clientService.getClientsLookups();
-            if (client == null) {
-                return new ResponseEntity<List<ClientLookup>>(client, HttpStatus.NOT_FOUND);
+            List<ClientLookup> clients = this.clientService.getClientsLookups(keyword, statusId, daysToLock);
+            if (clients == null) {
+                return new ResponseEntity<List<ClientLookup>>(clients, HttpStatus.NOT_FOUND);
             }
 
-            return new ResponseEntity<List<ClientLookup>>(client, HttpStatus.OK);
+            return new ResponseEntity<List<ClientLookup>>(clients, HttpStatus.OK);
         } catch (Exception e) {
         	return new ResponseEntity<List<ClientLookup>>(HttpStatus.INTERNAL_SERVER_ERROR);
         }

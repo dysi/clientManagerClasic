@@ -7,6 +7,7 @@ function VMHome() {
 		vm.isLoading = ko.observable(false);
 		vm.clienteID = ko.observable(-1);
 		vm.clientesList = ko.observableArray([]);
+		vm.counterClient = ko.observable(0);
 		
 		vm.client = ko.observable();
 		
@@ -16,6 +17,7 @@ function VMHome() {
 		vm.licenseId = ko.observable(-1);
 		
 		vm.licenciasList = ko.observableArray([]);
+		
 		
 		vm.licenciaUpd = ko.observable();
 		
@@ -28,15 +30,25 @@ function VMHome() {
 
 		// Methods
 		vm.initHome = function() {
-			
 			vm.isLoading(true);
 			
 			vm.clientesList().length = 0;
 			
+			var urlAux = "../api/clients/getClientsLookups";
+			var urlParam = null;
+			var keyword = $("#keyword").val();
+			if(!!keyword){
+				urlParam = "?keyword=" + keyword;
+			}
+			var statusId = $("#statusId").val();
+			if(!!statusId){
+				urlParam = (!!urlParam ? (urlParam + "&" + "statusId=" + statusId) : ("?" + ("statusId=" + statusId)));
+			}
+			
 			$.ajax
 			({
 			  type: "GET",
-			  url: "../api/clients/getClientsLookups",
+			  url: (urlAux + urlParam),
 			  dataType: 'json',
 			  async: false,
 			  headers: {
@@ -46,6 +58,13 @@ function VMHome() {
 				if(!!data){
 					
 	        		vm.clientesList(data);
+	        		var arr = [];
+	        		for (var i = 0; i < data.length; i++) {
+	        			arr.push(data[i].id);
+        			}
+	        		var res = arr.filter((item,
+	        		        index) => arr.indexOf(item) === index);
+	        		vm.counterClient(res.length)
 	        	}
 			  },
 			  error: function (error){

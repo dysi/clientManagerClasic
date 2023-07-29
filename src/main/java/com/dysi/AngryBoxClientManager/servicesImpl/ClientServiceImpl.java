@@ -9,6 +9,7 @@ import com.dysi.AngryBoxClientManager.repositories.UserRepository;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,8 +46,27 @@ public class ClientServiceImpl implements ClientService {
 	}
 	
 	@Override
-	public List<ClientLookup> getClientsLookups() {
-		List<ClientLookup> clientsDTO = this.clientRepository.findAllLookup();
+	public List<ClientLookup> getClientsLookups(String keyword, Integer statusId, Integer daysToLock) {
+		if(keyword != null) {
+			if(keyword.trim().length() == 0) {
+				keyword = null;
+			} else {
+				keyword = ("%" + keyword.trim() + "%");
+			}
+		}
+
+		if(statusId == null) {
+			statusId = -1;
+		}
+		if(daysToLock == null) {
+			daysToLock = 15;
+		}
+				
+		Calendar dateMax = Calendar.getInstance();
+		dateMax.add(Calendar.DAY_OF_MONTH, daysToLock);
+		
+		
+		List<ClientLookup> clientsDTO = this.clientRepository.findAllLookupFilter(keyword, statusId, Calendar.getInstance(), dateMax);
 		return clientsDTO;
 	}
 
