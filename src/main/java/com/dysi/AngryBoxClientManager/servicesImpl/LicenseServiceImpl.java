@@ -52,7 +52,7 @@ public class LicenseServiceImpl implements LicenseService {
 		
 		if(edicion){
 			//EDICION Y ID CLIENTE SE MANTIENE
-			licenseEdit = this.licenseRepository.findOne(licDTO.getId());
+			licenseEdit = this.licenseRepository.findById(licDTO.getId()).orElse(null);
 			LicenseStatus licenciaBase = licenseEdit.getLicenseStatuses().get(0);
 			if(licDTO.getLockDate() != null){
 				licenciaBase.setLockDate(licDTO.getLockDate());
@@ -68,7 +68,7 @@ public class LicenseServiceImpl implements LicenseService {
 			if(companyExiste != null && companyExiste.size() > 0){
 				return ("99|EL ID DE LA COMPAÑIA YA ESTA EN USO: #" + companyExiste.get(0).getCompanyId() + ". " + companyExiste.get(0).getCompanyName());
 			}
-			Client client = clientRepository.findOne(licDTO.getClienteId());
+			Client client = clientRepository.findById(licDTO.getClienteId()).orElse(null);
 			if(client == null){
 				return ("98|NO SE ENCONTRO EL CLIENTE: #" + licDTO.getClienteId());
 			}
@@ -125,7 +125,7 @@ public class LicenseServiceImpl implements LicenseService {
 
 	@Override
 	public String licenciaBloquear(Long licenciaID) {
-		License licenseEdit = this.licenseRepository.findOne(licenciaID);
+		License licenseEdit = this.licenseRepository.findById(licenciaID).orElse(null);
 		if(licenseEdit == null){
 			return ("99|EL ID DE LA LICENCIA NO EXISTE: #" + licenciaID);
 		}

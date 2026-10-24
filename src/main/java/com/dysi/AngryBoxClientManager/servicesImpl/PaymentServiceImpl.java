@@ -27,7 +27,7 @@ public class PaymentServiceImpl implements PaymentService {
 	public LicensePaymentsPaginationDTO getLicensePaymentsPaginated(License license, int pageSize, int pageNumber) {
 		
 		LicensePaymentsPaginationDTO lppDTO = new LicensePaymentsPaginationDTO();
-		PageRequest request = new PageRequest(pageNumber - 1, pageSize);
+		PageRequest request = PageRequest.of(pageNumber - 1, pageSize);
 		Page<Payment> paymentsPage = this.paymentRepository.findPaymentsPaginatedByLicense(license.getId(), request);
 		
 		lppDTO.setLicenseId(license.getId());
@@ -50,7 +50,7 @@ public class PaymentServiceImpl implements PaymentService {
 	@Override
 	public String editPayment(PaymentDTO payDTO) {
 		
-		License licenseEdit = this.licenseRepository.findOne(payDTO.getLicenseId());
+		License licenseEdit = this.licenseRepository.findById(payDTO.getLicenseId()).orElse(null);
 		if(licenseEdit == null){
 			return ("99|EL ID DE LA LICENCIA NO EXISTE: #" + payDTO.getLicenseId());
 		}
@@ -89,7 +89,7 @@ public class PaymentServiceImpl implements PaymentService {
 
 	@Override
 	public String pagoBaja(Long pagoID) {
-		Payment paymentEdit = this.paymentRepository.findOne(pagoID);
+		Payment paymentEdit = this.paymentRepository.findById(pagoID).orElse(null);
 		if(paymentEdit == null){
 			return ("99|EL ID DEL PAGO NO EXISTE: #" + pagoID);
 		}

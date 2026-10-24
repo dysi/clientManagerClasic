@@ -72,7 +72,7 @@ public class ClientServiceImpl implements ClientService {
 
 	@Override
 	public Client getClientByID(Long clientID) {
-		return this.clientRepository.findOne(clientID);
+		return this.clientRepository.findById(clientID).orElse(null);
 	}
 
 	@Override
@@ -81,7 +81,7 @@ public class ClientServiceImpl implements ClientService {
 
 		if (clientEdit.getIdOld() > 0) {
 			// EDICION Y ID CLIENTE SE MANTIENE
-			cliente = this.clientRepository.findOne(clientEdit.getIdOld());
+			cliente = this.clientRepository.findById(clientEdit.getIdOld()).orElse(null);
 		}
 
 		cliente.setLastname(clientEdit.getLastname() != null ? clientEdit.getLastname().trim() : "");

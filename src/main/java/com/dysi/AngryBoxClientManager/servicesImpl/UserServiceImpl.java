@@ -30,7 +30,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public UserCreateDTO getUserCreateDTOById(long id) {
 
-		User u = this.userRepository.findOne(id);
+		User u = this.userRepository.findById(id).orElse(null);
 
 		UserCreateDTO uDTO = new UserCreateDTO();
 		uDTO.setId(u.getId());
@@ -74,7 +74,7 @@ public class UserServiceImpl implements UserService {
 
 			User nu = new User();
 			if (user.getId() != null && user.getId().longValue() > 0) {
-				nu = this.userRepository.findOne(user.getId());
+				nu = this.userRepository.findById(user.getId()).orElse(null);
 			} else {
 				List<User> exist = this.userRepository.existUser(user.getUsername());
 				if(exist != null && exist.size() > 0) {
@@ -92,7 +92,7 @@ public class UserServiceImpl implements UserService {
 			nu.setAuthorities(this.getAuthorityList(user.getAuthorities()));
 
 			if (user.getClientID() != null && user.getClientID().longValue() > 0) {
-				clientUpdate = this.clientRepository.findOne(user.getClientID());
+				clientUpdate = this.clientRepository.findById(user.getClientID()).orElse(null);
 				nu.setClient(clientUpdate);
 				clientUpdate.setUser(nu);
 			} else {
@@ -118,7 +118,7 @@ public class UserServiceImpl implements UserService {
 	private List<Authority> getAuthorityList(List<Long> authIdList) {
 		List<Authority> authList = new ArrayList<>();
 		for (Long id : authIdList) {
-			authList.add(this.authorityRepository.findOne(id));
+			authList.add(this.authorityRepository.findById(id).orElse(null));
 		}
 		return authList;
 	}
