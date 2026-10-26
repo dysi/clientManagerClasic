@@ -1,6 +1,6 @@
 import type { Router } from "vue-router";
 
-export const homePath = "/clients";
+export const homePath = "/licenses";
 
 // Only known internal screens may be used as a post-login destination.
 export function returnPath(value: unknown, router: Router): string {

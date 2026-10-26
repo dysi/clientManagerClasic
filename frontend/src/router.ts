@@ -1,10 +1,14 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import { session } from "./features/auth/session";
-import { loginLocation, returnPath } from "./features/auth/navigation";
+import {
+  homePath,
+  loginLocation,
+  returnPath,
+} from "./features/auth/navigation";
 export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: "/", redirect: "/clients" },
+    { path: "/", redirect: homePath },
     {
       path: "/login",
       component: () => import("./features/auth/LoginPage.vue"),
@@ -65,7 +69,7 @@ export const router = createRouter({
       path: "/users/:id/password",
       component: () => import("./features/users/PasswordPage.vue"),
     },
-    { path: "/:pathMatch(.*)*", redirect: "/clients" },
+    { path: "/:pathMatch(.*)*", redirect: homePath },
   ],
 });
 router.beforeEach((to) => {

@@ -16,7 +16,7 @@ export function usePagedList<T>(
   const rows = ref<T[]>([]) as Ref<T[]>;
   const keyword = ref("");
   const page = ref(0);
-  const size = ref(15);
+  const size = ref(50);
   const total = ref(0);
   const loading = ref(false);
   const error = ref("");

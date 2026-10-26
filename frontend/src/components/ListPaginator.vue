@@ -8,7 +8,7 @@ defineEmits<{ change: [page: number, size: number] }>();
     :first="page * size"
     :rows="size"
     :total-records="total"
-    :rows-per-page-options="[15, 30, 50]"
+    :rows-per-page-options="[25, 50, 100]"
     template="PrevPageLink CurrentPageReport NextPageLink RowsPerPageDropdown"
     current-page-report-template="{first}–{last} de {totalRecords}"
     @page="$emit('change', $event.page, $event.rows)"

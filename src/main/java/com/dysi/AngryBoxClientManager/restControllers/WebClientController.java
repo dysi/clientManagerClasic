@@ -27,7 +27,7 @@ public class WebClientController {
 
     @GetMapping
     public Page<ClientDTO> list(@RequestParam(defaultValue = "") String keyword,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "15") int size) {
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
         if (page < 0 || size < 1 || size > 100 || keyword.length() > 150) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parámetros de búsqueda inválidos.");
         }

@@ -44,7 +44,7 @@ La configuración heredada contiene valores de conexión y secreto que deben sus
 ## Navegación y bienvenida
 
 - Abrir `http://localhost:3000/` redirige a la aplicación, conservando el contexto `/clientmanager` y las URLs de las integraciones existentes. Si el despliegue usa otro contexto, la entrada se adapta a esa configuración.
-- Sin sesión, la entrada lleva a `/ui/#/login`. Con sesión, lleva a `/ui/#/clients`, la pantalla principal actual.
+- Sin sesión, la entrada lleva a `/ui/#/login`. Con sesión, lleva a `/ui/#/licenses`, la pantalla principal actual.
 - Una URL protegida conserva su ruta y filtros en `redirect`; al autenticarse se regresa a esa pantalla. Solo se aceptan destinos internos conocidos; se rechazan URLs externas, rutas inexistentes y retornos al login.
 - Una sesión vencida redirige al login con el destino pendiente. Un intento de acceso fallido conserva ese destino. Cerrar sesión voluntariamente muestra el login sin restaurar la pantalla anterior automáticamente.
 - Abrir el login con sesión vigente lleva a la pantalla principal, evitando un segundo ingreso innecesario.
@@ -115,7 +115,7 @@ Criterios de mantenimiento:
 
 Las operaciones iniciadas desde la ficha de un cliente o una licencia llevan la relación preseleccionada. No se cambia el cliente de una licencia existente ni la licencia de un pago existente. El formulario de usuario existente conserva el hash de contraseña; solo el formulario específico de contraseña lo modifica. La cuenta activa no puede deshabilitarse ni quitarse su propio rol ADMIN.
 
-Los listados muestran cargas, errores y estados vacíos. Las confirmaciones usan el diálogo del framework y los resultados se notifican con Toast. La navegación y los formularios se adaptan al ancho disponible; las tablas permiten desplazamiento horizontal cuando sus columnas lo requieren.
+Los listados muestran cargas, errores y estados vacíos. La paginación ofrece 25, 50 y 100 registros, con 50 por defecto. Las filas se resaltan al pasar el mouse mediante la opción nativa de PrimeVue. Licencias permite combinar búsqueda de texto, estado y un selector de clientes con búsqueda remota; limpiar el cliente conserva los demás filtros. Las confirmaciones usan el diálogo del framework y los resultados se notifican con Toast. La navegación y los formularios se adaptan al ancho disponible; las tablas permiten desplazamiento horizontal cuando sus columnas lo requieren.
 
 Las URLs anteriores `/users/login`, `/index/home`, `/users/create`, `/users/create/{id}` y `/users/edit/{id}` redirigen a las rutas nuevas. Ya no renderizan pantallas anteriores.
 
@@ -129,7 +129,7 @@ Las URLs anteriores `/users/login`, `/index/home`, `/users/create`, `/users/crea
 
 El identificador de empresa se verifica al crear y editar. La garantía bajo concurrencia requiere una restricción de base de datos, pendiente de una migración de esquema. Los importes aceptan hasta dos decimales y el descuento no puede superar el importe. El transporte utiliza `BigDecimal`; las columnas existentes siguen siendo `Double`, por lo que queda pendiente migrarlas a DECIMAL.
 
-Una licencia está bloqueada si tiene bloqueo forzado, vencida si su fecha de bloqueo es hoy o anterior, y por vencer si vence dentro de 15 días. El filtro de activas incluye las vigentes que están por vencer. Una licencia sin fecha aparece con estado desconocido y debe completarse. Las fechas viajan como `YYYY-MM-DD`; su interpretación usa el día local del servidor. Definir una zona horaria coherente entre despliegues.
+La columna Fecha de bloqueo incluye el contador de días calculado en la zona horaria del servidor (`daysUntilLock`). Las filas bloqueadas usan fondo rojo; las vencidas, fondo y etiqueta amarillos; las que vencen dentro de 1 a 15 días muestran Por vencer en rojo. Los estados de peligro/advertencia conservan su color al pasar el mouse. Una licencia está bloqueada si tiene bloqueo forzado, vencida si su fecha de bloqueo es hoy o anterior, y por vencer si vence dentro de 15 días. El filtro de activas incluye las vigentes que están por vencer. Una licencia sin fecha aparece con estado desconocido y debe completarse. Las fechas viajan como `YYYY-MM-DD`; su interpretación usa el día local del servidor. Definir una zona horaria coherente entre despliegues.
 
 Los pagos se consideran pendientes sin fecha de cobro, pagados con ella y anulados si tienen fecha de baja. Anular no borra el registro; debe reactivarse antes de editarlo. Registrar o cobrar un pago **no extiende automáticamente la licencia**. Bloqueo y anulación reciben un estado explícito: repetir la misma petición no alterna el resultado ni reemplaza la fecha de baja original.
 
@@ -205,8 +205,8 @@ El recorrido crea y modifica datos, por lo que no debe ejecutarse contra producc
 
 El análisis no aporta una necesidad demostrada de microservicios. La separación por módulos y contratos dentro del monolito permite mantener un despliegue único y evolucionar gradualmente el backend.
 
-## Resultado de la entrega (24/10/2026)
+## Resultado de la entrega (26/10/2026)
 
-Verificado con JDK 11: **`mvnw.cmd clean verify` — BUILD SUCCESS**, **13 pruebas Java**, **18 pruebas Vitest** y **2 recorridos Playwright completos** aprobados. La auditoría npm informó **0 vulnerabilidades**. Se revisaron capturas de escritorio y móvil y se comprobó que el JAR no contiene las plantillas, assets ni dependencias visuales retiradas. El recorrido se ejecutó sobre el JAR generado, con H2 y datos temporales externos, y cerró el proceso al finalizar.
+Verificado con JDK 11: **`mvnw.cmd clean verify` — BUILD SUCCESS**, **15 pruebas Java**, **25 pruebas Vitest** y **3 recorridos Playwright completos** aprobados. La auditoría npm informó **0 vulnerabilidades**. Se revisaron capturas de escritorio y móvil y se comprobó que el JAR no contiene las plantillas, assets ni dependencias visuales retiradas. El recorrido se ejecutó sobre el JAR generado, con H2 y datos temporales externos, y cerró el proceso al finalizar.
 
 No se conectó a MySQL ni se verificaron el esquema de producción, sus datos existentes o el consumidor AngryBox. Esas comprobaciones siguen siendo necesarias antes del despliegue en ese entorno.

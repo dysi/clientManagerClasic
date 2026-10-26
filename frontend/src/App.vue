@@ -8,7 +8,7 @@ import ConfirmDialog from "primevue/confirmdialog";
 import Toast from "primevue/toast";
 import { session, signOut } from "./features/auth/session";
 import { useConfirmAction } from "./composables/useConfirmAction";
-import { loginLocation } from "./features/auth/navigation";
+import { homePath, loginLocation } from "./features/auth/navigation";
 const route = useRoute();
 const router = useRouter();
 const confirm = useConfirmAction();
@@ -70,7 +70,7 @@ onUnmounted(() => window.removeEventListener("session-expired", expired));
       >
         <template #start
           ><RouterLink
-            to="/clients"
+            :to="homePath"
             class="mr-6 flex items-center gap-3 font-semibold text-primary"
             ><i class="pi pi-building text-xl" aria-hidden="true" /><span
               >DySI

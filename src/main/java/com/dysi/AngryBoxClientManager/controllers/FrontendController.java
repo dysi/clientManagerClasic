@@ -22,5 +22,5 @@ public class FrontendController {
     public String editUser(@PathVariable long id) { return "redirect:/ui/#/users/" + id + "/edit"; }
 
     @GetMapping("/index/home")
-    public String oldHome() { return "redirect:/ui/#/clients"; }
+    public String oldHome() { return "redirect:/ui/#/licenses"; }
 }

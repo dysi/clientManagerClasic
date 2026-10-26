@@ -215,8 +215,10 @@ public class WebAdminService {
         view.clientName = clientName(license.getClient()); view.initialActivity = date(license.getInitialActivity()); view.prePayment = license.isPrePayment();
         LicenseStatus state = currentState(license);
         view.lockDate = state == null ? null : date(state.getLockDate()); view.locked = state != null && state.isForcedLock();
-        view.status = view.locked ? "BLOCKED" : view.lockDate == null ? "UNKNOWN" : !view.lockDate.isAfter(LocalDate.now()) ? "EXPIRED"
-                : !view.lockDate.isAfter(LocalDate.now().plusDays(15)) ? "EXPIRING" : "ACTIVE";
+        // Calendar days in the server's business timezone, shared by status and countdown.
+        view.daysUntilLock = view.lockDate == null ? null : java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), view.lockDate);
+        view.status = view.locked ? "BLOCKED" : view.daysUntilLock == null ? "UNKNOWN" : view.daysUntilLock <= 0 ? "EXPIRED"
+                : view.daysUntilLock <= 15 ? "EXPIRING" : "ACTIVE";
         return view;
     }
     private PaymentView paymentView(Payment payment) {

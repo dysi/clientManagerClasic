@@ -71,6 +71,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 - Una licencia existente no cambia de cliente desde el formulario actual. Comprobar duplicados de `companyId` al crear y editar; la comprobación de aplicación no sustituye una futura restricción de base de datos.
 - `LicenseStatus` contiene vigencia y bloqueo forzado. Actualmente el flujo web toma el estado no eliminado de menor ID y crea uno al guardar una licencia sin estado. No cambiar la selección histórica ni asumir que siempre existe `get(0)`.
 - Con bloqueo forzado, la licencia está bloqueada. Sin él, vence al comenzar la fecha de bloqueo; el estado por vencer comprende los próximos 15 días. El filtro de activas incluye las vigentes que están por vencer.
+- En la tabla, mostrar fecha de bloqueo y días restantes calculados por el servidor. El bloqueo forzado prioriza fondo rojo; vencida usa fondo/estado amarillo; por vencer (1 a 15 días) se indica en rojo. Conservar los colores semánticos durante hover.
 - Bloquear/desbloquear expresa el estado deseado. Reintentar la misma petición no debe alternarlo.
 
 ### Pagos y fechas
@@ -94,6 +95,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 - Usar DTO explícitos para la API web, Bean Validation y respuestas JSON coherentes mediante `WebErrorHandler`. No exponer entidades completas, hashes, trazas o detalles internos.
 - Mantener tipos y nulabilidad alineados entre DTO, servicio y formulario. Validar relaciones, IDs, permisos y registros inexistentes antes de persistir.
 - Preservar estados HTTP apropiados: 400 para entrada inválida, 401 sin sesión válida, 403 sin permisos, 404 para ausencias y 409 para conflictos de negocio.
+- Los listados web usan 50 registros por defecto y ofrecen tamaños 25, 50 y 100 en el frontend.
 - Paginar y filtrar en base de datos; reutilizar `JpaSpecificationExecutor` y las consultas existentes. Mantener los límites actuales del contrato web o cambiar sus consumidores y pruebas explícitamente.
 - Parametrizar JPQL/SQL y escapar comodines cuando la búsqueda deba ser literal. No concatenar entradas externas ni cargar todo el listado para paginarlo en memoria.
 
@@ -136,7 +138,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 
 - Mantener historial hash, páginas lazy y resolución del contexto sin hostname fijo en producción.
 - La entrada por el puerto se resuelve en `PortEntryConfig`; la entrada SPA y los alias anteriores, en `FrontendController`. Una prueba MockMvc no verifica una ruta fuera del contexto servlet: usar HTTP real para ese caso.
-- La pantalla principal actual es `/clients`. Sin sesión, redirigir al login; con sesión, abrir la principal o el destino interno solicitado.
+- La pantalla principal actual es `/licenses`. Sin sesión, redirigir al login; con sesión, abrir la principal o el destino interno solicitado.
 - Reutilizar `features/auth/navigation.ts` para conservar destino y filtros tras autenticación o vencimiento. Rechazar retornos externos, desconocidos o circulares al login.
 - Un login fallido conserva el destino pendiente. El logout voluntario no debe recuperar automáticamente una pantalla protegida.
 - La configuración de desarrollo utiliza `/clientmanager` y proxy Vite al backend en 3000. Si cambia ese contrato, revisar conjuntamente `vite.config.ts`, `services/http.ts`, documentación y pruebas.

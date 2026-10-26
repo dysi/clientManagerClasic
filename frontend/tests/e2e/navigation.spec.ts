@@ -66,11 +66,11 @@ test("entrada por el puerto, bienvenida, destino solicitado y sesión vencida", 
   await expect(page).toHaveURL(/#\/licenses\?clientId=100$/);
   await page.goto(entry);
   await expect(
-    page.getByRole("heading", { name: "Clientes", exact: true }),
+    page.getByRole("heading", { name: "Licencias", exact: true }),
   ).toBeVisible();
   await page.goto(baseURL + "#/login");
   await expect(
-    page.getByRole("heading", { name: "Clientes", exact: true }),
+    page.getByRole("heading", { name: "Licencias", exact: true }),
   ).toBeVisible();
 
   // Simulate server-side expiration while the browser is on a protected page.

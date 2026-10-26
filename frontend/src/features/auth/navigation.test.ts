@@ -15,7 +15,7 @@ describe("Navegación de acceso", () => {
       returnPath(router.currentRoute.value.query.redirect, router),
     );
     await router.push("/login");
-    expect(router.currentRoute.value.path).toBe("/clients");
+    expect(router.currentRoute.value.path).toBe("/licenses");
   });
   it("conserva la pantalla protegida y sus filtros al iniciar sesión", async () => {
     await router.push("/payments?licenseId=7");
@@ -37,6 +37,6 @@ describe("Navegación de acceso", () => {
     undefined,
     ["/users"],
   ])("rechaza destinos externos, inválidos o circulares: %s", (value) => {
-    expect(returnPath(value, router)).toBe("/clients");
+    expect(returnPath(value, router)).toBe("/licenses");
   });
 });

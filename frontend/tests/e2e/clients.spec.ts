@@ -53,6 +53,8 @@ test("administración completa con formularios separados y sesión segura", asyn
   await page.getByLabel(/^Usuario/).fill(username);
   await page.getByLabel(/^Contraseña/).fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(heading("Licencias")).toBeVisible();
+  await page.getByRole("menuitem", { name: "Clientes", exact: true }).click();
   await expect(heading("Clientes")).toBeVisible();
   await page.getByRole("link", { name: "Saltar al contenido" }).focus();
   await page.keyboard.press("Enter");

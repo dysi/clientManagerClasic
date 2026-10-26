@@ -6,8 +6,8 @@ const states: Record<
   { label: string; severity: "success" | "warn" | "danger" | "secondary" }
 > = {
   ACTIVE: { label: "Activa", severity: "success" },
-  EXPIRING: { label: "Por vencer", severity: "warn" },
-  EXPIRED: { label: "Vencida", severity: "danger" },
+  EXPIRING: { label: "Por vencer", severity: "danger" },
+  EXPIRED: { label: "Vencida", severity: "warn" },
   BLOCKED: { label: "Bloqueada", severity: "danger" },
   UNKNOWN: { label: "Sin fecha", severity: "secondary" },
 };
@@ -16,5 +16,10 @@ const states: Record<
   <Tag
     :value="(states[status] || states.UNKNOWN)!.label"
     :severity="(states[status] || states.UNKNOWN)!.severity"
+    :dt="{
+      colorScheme: {
+        light: { warn: { background: '{amber.200}', color: '{amber.950}' } },
+      },
+    }"
   />
 </template>

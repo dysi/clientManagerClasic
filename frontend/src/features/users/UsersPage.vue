@@ -53,6 +53,7 @@ function roles(values: string[]) {
         :value="rows"
         :loading="loading"
         data-key="id"
+        row-hover
         striped-rows
         scrollable
       >

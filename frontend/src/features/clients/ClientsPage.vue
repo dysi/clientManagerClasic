@@ -35,6 +35,7 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
         :value="rows"
         :loading="loading"
         data-key="id"
+        row-hover
         striped-rows
         scrollable
       >

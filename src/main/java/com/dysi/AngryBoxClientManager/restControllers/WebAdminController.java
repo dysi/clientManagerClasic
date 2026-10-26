@@ -20,7 +20,7 @@ public class WebAdminController {
 
     @GetMapping("/licenses") public Page<LicenseView> licenses(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long clientId, @RequestParam(defaultValue = "ALL") String status,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "15") int size) {
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
         return service.licenses(keyword, clientId, status, page, size);
     }
     @GetMapping("/licenses/{id}") public LicenseView license(@PathVariable long id) { return service.license(id); }
@@ -31,7 +31,7 @@ public class WebAdminController {
 
     @GetMapping("/payments") public Page<PaymentView> payments(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long licenseId, @RequestParam(defaultValue = "ALL") String status,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "15") int size) {
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
         return service.payments(keyword, licenseId, status, page, size);
     }
     @GetMapping("/payments/{id}") public PaymentView payment(@PathVariable long id) { return service.payment(id); }
@@ -41,7 +41,7 @@ public class WebAdminController {
     @PutMapping("/payments/{id}/status") public PaymentView paymentStatus(@PathVariable long id, @Valid @RequestBody PaymentStatusInput input) { return service.paymentStatus(id, input.removed); }
 
     @GetMapping("/users") public Page<UserView> users(@RequestParam(defaultValue = "") String keyword,
-            @RequestParam(required = false) Long clientId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "15") int size) {
+            @RequestParam(required = false) Long clientId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
         return service.users(keyword, clientId, page, size);
     }
     @GetMapping("/users/{id}") public UserView user(@PathVariable long id) { return service.user(id); }

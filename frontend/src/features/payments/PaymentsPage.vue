@@ -108,6 +108,7 @@ async function changeStatus(payment: Payment) {
         :value="rows"
         :loading="loading"
         data-key="id"
+        row-hover
         striped-rows
         scrollable
       >

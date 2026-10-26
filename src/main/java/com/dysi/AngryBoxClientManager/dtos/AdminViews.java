@@ -19,6 +19,7 @@ public final class AdminViews {
         public Long id, clientId, companyId;
         public String clientName, companyName, description, status;
         public LocalDate initialActivity, lockDate;
+        public Long daysUntilLock;
         public boolean prePayment, locked;
     }
 

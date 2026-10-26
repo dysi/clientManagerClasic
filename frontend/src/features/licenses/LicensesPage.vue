@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -12,19 +12,27 @@ import PageHeader from "../../components/PageHeader.vue";
 import ListToolbar from "../../components/ListToolbar.vue";
 import ListPaginator from "../../components/ListPaginator.vue";
 import LicenseStatus from "../../components/LicenseStatus.vue";
+import EntitySelect from "../../components/EntitySelect.vue";
+import FormField from "../../components/FormField.vue";
 import { usePagedList } from "../../composables/usePagedList";
 import { useConfirmAction } from "../../composables/useConfirmAction";
 import { request } from "../../services/http";
-import { displayDate } from "../../services/format";
+import { licenseRowClass, lockDateLabel } from "./presentation";
 import type { License } from "../../services/admin";
+import { clientsApi } from "../clients/api";
 const route = useRoute();
 const toast = useToast();
 const confirm = useConfirmAction();
 const status = ref("ALL");
 const acting = ref<number>();
-const clientId = route.query.clientId
-  ? Number(route.query.clientId)
-  : undefined;
+const initialClientId = Number(route.query.clientId);
+const clientId = ref<number | null>(
+  Number.isSafeInteger(initialClientId) && initialClientId > 0
+    ? initialClientId
+    : null,
+);
+const clientName = ref("");
+const clientError = ref("");
 const states = [
   { label: "Todas", value: "ALL" },
   { label: "Activas", value: "ACTIVE" },
@@ -45,8 +53,28 @@ const {
   load,
 } = usePagedList<License>("/web/api/licenses", () => ({
   status: status.value,
-  clientId,
+  clientId: clientId.value,
 }));
+onMounted(async () => {
+  const id = clientId.value;
+  if (id == null) return;
+  try {
+    const client = await clientsApi.detail(id);
+    if (clientId.value === id)
+      clientName.value = `${client.firstname} ${client.lastname}`;
+  } catch {
+    if (clientId.value === id)
+      clientError.value =
+        "No se pudo cargar el nombre del cliente seleccionado. Podés buscar otro cliente o limpiar el filtro.";
+  }
+});
+function filterClient(id: number | null) {
+  if (id === clientId.value) return;
+  clientId.value = id;
+  clientName.value = "";
+  clientError.value = "";
+  void search();
+}
 async function changeLock(license: License) {
   const locked = !license.locked;
   if (
@@ -85,10 +113,9 @@ async function changeLock(license: License) {
       label="Nueva licencia"
       icon="pi pi-plus"
   /></PageHeader>
-  <Message v-if="clientId" severity="info" class="mb-4"
-    >Licencias del cliente #{{ clientId }}.
-    <RouterLink to="/licenses" class="underline">Ver todas</RouterLink></Message
-  >
+  <Message v-if="clientError" severity="warn" class="mb-4">{{
+    clientError
+  }}</Message>
   <Message v-if="error" severity="error" class="mb-4">{{ error }}</Message>
   <Card
     ><template #content>
@@ -97,18 +124,46 @@ async function changeLock(license: License) {
         :loading="loading"
         placeholder="Empresa o cliente"
         @search="search"
-        ><Select
-          v-model="status"
-          :options="states"
-          option-label="label"
-          option-value="value"
-          aria-label="Estado de licencia"
-          @change="search"
-      /></ListToolbar>
+        ><div class="flex w-full flex-wrap items-end gap-3">
+          <FormField
+            id="license-client-filter"
+            label="Cliente"
+            class="w-full sm:w-72"
+          >
+            <EntitySelect
+              :model-value="clientId"
+              :label="clientName"
+              kind="clients"
+              input-id="license-client-filter"
+              @update:model-value="filterClient"
+            />
+          </FormField>
+          <Button
+            v-if="clientId"
+            type="button"
+            label="Limpiar cliente"
+            icon="pi pi-filter-slash"
+            text
+            severity="secondary"
+            @click="filterClient(null)"
+          />
+          <FormField id="license-status-filter" label="Estado">
+            <Select
+              input-id="license-status-filter"
+              v-model="status"
+              :options="states"
+              option-label="label"
+              option-value="value"
+              aria-label="Estado de licencia"
+              @change="search"
+          /></FormField></div
+      ></ListToolbar>
       <DataTable
         :value="rows"
         :loading="loading"
         data-key="id"
+        row-hover
+        :row-class="licenseRowClass"
         striped-rows
         scrollable
       >
@@ -123,9 +178,9 @@ async function changeLock(license: License) {
             </p></template
           ></Column
         >
-        <Column header="Vigencia"
+        <Column header="Fecha de bloqueo"
           ><template #body="{ data }"
-            ><span>{{ displayDate(data.lockDate) }}</span>
+            ><span>{{ lockDateLabel(data) }}</span>
             <p class="mt-1 text-sm text-muted-color">
               {{ data.prePayment ? "Pago adelantado" : "Mes vencido" }}
             </p></template

@@ -8,6 +8,7 @@ export interface License {
   description: string;
   initialActivity: string;
   lockDate: string | null;
+  daysUntilLock: number | null;
   prePayment: boolean;
   locked: boolean;
   status: string;

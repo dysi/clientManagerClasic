@@ -51,6 +51,46 @@ class WebFrontendTests {
                 "lockDate", "2099-12-31", "prePayment", true));
     }
 
+    @Test void webListsDefaultToFiftyAndLicenseFiltersCombine() throws Exception {
+        account(AuthorityName.ROLE_ADMIN); Browser browser = login();
+        long first = newClient(browser, "Primero");
+        long second = newClient(browser, "Segundo");
+        long license = write(browser, "POST", "/web/api/licenses", licenseInput(first, 111L), 201).get("id").asLong();
+        write(browser, "POST", "/web/api/licenses", licenseInput(second, 222L), 201);
+        for (String resource : List.of("clients", "licenses", "payments", "users")) {
+            mvc.perform(get("/web/api/" + resource).session(browser.session))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(50));
+        }
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("clientId", String.valueOf(first))
+                .param("keyword", "Empresa de prueba").param("status", "ACTIVE").param("size", "25"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(license));
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("clientId", String.valueOf(first))
+                .param("keyword", "No coincide").param("status", "ACTIVE"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("clientId", String.valueOf(first))
+                .param("keyword", "Empresa de prueba").param("status", "BLOCKED").param("size", "100"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test void licenseCountdownAndStatusUseTheSameCalendarDayBoundaries() throws Exception {
+        account(AuthorityName.ROLE_ADMIN); Browser browser = login();
+        var input = licenseInput(newClient(browser, "Fecha"), 333L);
+        long id = write(browser, "POST", "/web/api/licenses", input, 201).get("id").asLong();
+        int[] days = {-1, 0, 1, 15, 16, 35};
+        String[] states = {"EXPIRED", "EXPIRED", "EXPIRING", "EXPIRING", "ACTIVE", "ACTIVE"};
+        for (int index = 0; index < days.length; index++) {
+            input.put("lockDate", java.time.LocalDate.now().plusDays(days[index]).toString());
+            JsonNode result = write(browser, "PUT", "/web/api/licenses/" + id, input, 200);
+            assertEquals(days[index], result.get("daysUntilLock").asInt());
+            assertEquals(states[index], result.get("status").asText());
+        }
+        assertEquals("BLOCKED", write(browser, "PUT", "/web/api/licenses/" + id + "/lock",
+                java.util.Map.of("locked", true), 200).get("status").asText());
+        input.put("lockDate", java.time.LocalDate.now().minusDays(1).toString());
+        assertEquals("BLOCKED", write(browser, "PUT", "/web/api/licenses/" + id, input, 200).get("status").asText());
+    }
+
     @Test void licensesValidateOwnershipUniquenessAndExplicitIdempotentLock() throws Exception {
         account(AuthorityName.ROLE_ADMIN); Browser browser = login();
         long client = newClient(browser, "Ana");
@@ -220,7 +260,7 @@ class WebFrontendTests {
         account(AuthorityName.ROLE_ADMIN);
         Browser browser = login();
         mvc.perform(get("/index/home").session(browser.session))
-                .andExpect(status().isFound()).andExpect(redirectedUrl("/ui/#/clients"));
+                .andExpect(status().isFound()).andExpect(redirectedUrl("/ui/#/licenses"));
         mvc.perform(get("/users/create").session(browser.session)).andExpect(status().isFound()).andExpect(redirectedUrl("/ui/#/users/new"));
     }
 
