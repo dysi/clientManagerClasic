@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface LicenseRepository extends JpaRepository<License, Long> {
+public interface LicenseRepository extends JpaRepository<License, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<License> {
 
     public List<License> findLicensesByClient(Client client);
     

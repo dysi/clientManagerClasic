@@ -30,11 +30,14 @@ public class ClientLookup {
 	}
 	
 	// CONSTRUCTOR AUTOMATICO
-	public ClientLookup(Long id, String firstname, String lastname, String username, String companyName, Long companyId, Calendar initialActivity,
+	public ClientLookup(Long id, String firstname, String lastname, String email, String phone, String cuil, String username, String companyName, Long companyId, Calendar initialActivity,
 			Calendar lockDateC, Boolean forcedLock) {
 		super();
 		this.id = id;
 		
+		this.email = email;
+		this.phone = phone;
+		this.cuil = cuil;
 		this.firstname = firstname;
 		this.lastname = lastname;
 		this.username = (username != null ? username : "");

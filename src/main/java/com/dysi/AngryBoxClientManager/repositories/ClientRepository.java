@@ -15,6 +15,21 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ClientRepository extends JpaRepository<Client, Long> {
+
+    @Query(value = "select c from Client c left join fetch c.user u where "
+            + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
+            + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
+            + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
+            + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
+            + "or lower(coalesce(u.username, '')) like :keyword escape '!'",
+            countQuery = "select count(c) from Client c left join c.user u where "
+            + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
+            + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
+            + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
+            + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
+            + "or lower(coalesce(u.username, '')) like :keyword escape '!'")
+    org.springframework.data.domain.Page<Client> searchForWeb(@Param("keyword") String keyword,
+            org.springframework.data.domain.Pageable pageable);
 	
     public Client findClientByUser(User user);
 
@@ -30,7 +45,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     
     // Long id, String firstname, String lastname, String username, String companyName, Long companyId, Calendar initialActivity, Calendar lockDateC, boolean forcedLock
     @Query("select new com.dysi.AngryBoxClientManager.dtos.ClientLookup("
-    		+ " c.id, c.firstname, c.lastname, u.username,"
+            + " c.id, c.firstname, c.lastname, c.email, c.phone, c.cuil, u.username,"
     		+ " l.companyName, l.companyId, l.initialActivity, s.lockDate, s.forcedLock)"
     		+ " from Client c "
     		+ " left join c.licenses l "
@@ -48,7 +63,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 	 */
     
     @Query("select new com.dysi.AngryBoxClientManager.dtos.ClientLookup("
-    		+ " c.id, c.firstname, c.lastname, u.username,"
+            + " c.id, c.firstname, c.lastname, c.email, c.phone, c.cuil, u.username,"
     		+ " l.companyName, l.companyId, l.initialActivity, s.lockDate, s.forcedLock)"
     		+ " from Client c "
     		+ " left join c.licenses l "

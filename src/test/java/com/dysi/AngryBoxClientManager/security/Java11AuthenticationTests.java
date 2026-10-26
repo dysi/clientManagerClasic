@@ -58,6 +58,9 @@ class Java11AuthenticationTests {
         assertEquals("java11user", tokens.getUsernameFromToken(token));
         assertEquals("web", tokens.getAudienceFromToken(token));
 
+        mockMvc.perform(get("/web/api/clients").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+
         mockMvc.perform(get("/user").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("java11user"));

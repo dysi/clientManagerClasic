@@ -26,8 +26,8 @@ public class AngryBoxClientManagerApplicationTests {
     @Test
     public void loginPageRenders() throws Exception {
         mockMvc.perform(get("/users/login"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("users/login"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(view().name("redirect:/ui/#/login"));
     }
 
 }

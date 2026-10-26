@@ -79,16 +79,17 @@ public class ClientServiceImpl implements ClientService {
 	public String editClient(ClientDTO clientEdit) {
 		Client cliente = new Client();
 
-		if (clientEdit.getIdOld() > 0) {
+		if (clientEdit.getIdOld() != null && clientEdit.getIdOld() > 0) {
 			// EDICION Y ID CLIENTE SE MANTIENE
-			cliente = this.clientRepository.findById(clientEdit.getIdOld()).orElse(null);
+			cliente = this.clientRepository.findById(clientEdit.getIdOld())
+                    .orElseThrow(() -> new IllegalArgumentException("No se encontró el cliente."));
 		}
 
 		cliente.setLastname(clientEdit.getLastname() != null ? clientEdit.getLastname().trim() : "");
 		cliente.setFirstname(clientEdit.getFirstname() != null ? clientEdit.getFirstname().trim() : "");
-		cliente.setCuil(clientEdit.getCuil() != null ? clientEdit.getCuil().trim() : "");
-		cliente.setPhone(clientEdit.getPhone() != null ? clientEdit.getPhone().trim() : "");
-		cliente.setEmail(clientEdit.getEmail() != null ? clientEdit.getEmail().trim() : "");
+		if (clientEdit.getCuil() != null) cliente.setCuil(clientEdit.getCuil().trim());
+		if (clientEdit.getPhone() != null) cliente.setPhone(clientEdit.getPhone().trim());
+		if (clientEdit.getEmail() != null) cliente.setEmail(clientEdit.getEmail().trim());
 
 		cliente = this.clientRepository.saveAndFlush(cliente);
 

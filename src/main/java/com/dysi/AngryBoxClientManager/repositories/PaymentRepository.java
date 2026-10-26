@@ -12,13 +12,13 @@ import org.springframework.stereotype.Repository;
 import com.dysi.AngryBoxClientManager.models.Payment;
 
 @Repository
-public interface PaymentRepository extends JpaRepository<Payment, Long> {
-	
+public interface PaymentRepository extends JpaRepository<Payment, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Payment> {
+
 	@Query("select p from Payment p inner join p.license l"
 			+ " where l.id = :licenseId"
 			+ " order by p.paymentDate desc")
 	Page<Payment> findPaymentsPaginatedByLicense(@Param("licenseId") Long licenseId, Pageable pageable);
-	
+
 	@Query("select p "
 			+ " from Payment p"
 			+ " inner join p.license l"

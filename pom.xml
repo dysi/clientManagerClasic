@@ -34,15 +34,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-rest</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -105,32 +97,44 @@
 		</dependency>
 
 
-		<!-- STATIC LIBS -->
-		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>jquery</artifactId>
-			<version>2.1.1</version>
-		</dependency>
-		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>bootstrap</artifactId>
-			<version>4.0.0-beta</version>
-		</dependency>
-		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>webjars-locator-core</artifactId>
-		</dependency>
 
-		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>font-awesome</artifactId>
-			<version>4.5.0</version>
-		</dependency>
 
 	</dependencies>
 
 	<build>
+		<resources>
+			<resource><directory>src/main/resources</directory></resource>
+			<resource><directory>${project.build.directory}/generated-resources/frontend</directory></resource>
+		</resources>
 		<plugins>
+			<plugin>
+				<groupId>com.github.eirslett</groupId>
+				<artifactId>frontend-maven-plugin</artifactId>
+				<version>1.15.1</version>
+				<configuration>
+					<workingDirectory>frontend</workingDirectory>
+					<installDirectory>${project.build.directory}/frontend-runtime</installDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<id>install-node</id><phase>initialize</phase>
+						<goals><goal>install-node-and-npm</goal></goals>
+						<configuration><nodeVersion>v24.22.1</nodeVersion><npmVersion>10.9.2</npmVersion></configuration>
+					</execution>
+					<execution>
+						<id>frontend-install</id><phase>generate-resources</phase>
+						<goals><goal>npm</goal></goals><configuration><arguments>ci --no-fund --no-audit</arguments></configuration>
+					</execution>
+					<execution>
+						<id>frontend-build</id><phase>generate-resources</phase>
+						<goals><goal>npm</goal></goals><configuration><arguments>run build</arguments></configuration>
+					</execution>
+					<execution>
+						<id>frontend-test</id><phase>test</phase>
+						<goals><goal>npm</goal></goals><configuration><arguments>test</arguments><skip>${skipTests}</skip></configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>

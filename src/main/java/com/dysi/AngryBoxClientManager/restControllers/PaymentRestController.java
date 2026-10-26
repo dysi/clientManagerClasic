@@ -72,7 +72,7 @@ public class PaymentRestController {
         }
     }
     
-    @RequestMapping("/payments/licenciaBloquear")
+    @RequestMapping(value = "/payments/licenciaBloquear", method = RequestMethod.POST)
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> licenciaBloquear(
     		@RequestParam(value = "licenciaID", required = true) Long licenciaID) {
@@ -128,7 +128,7 @@ public class PaymentRestController {
         }
     }
     
-    @RequestMapping("/payments/bajaPago")
+    @RequestMapping(value = "/payments/bajaPago", method = RequestMethod.POST)
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> bajaPago(
     		@RequestParam(value = "pagoID", required = true) Long pagoID) {

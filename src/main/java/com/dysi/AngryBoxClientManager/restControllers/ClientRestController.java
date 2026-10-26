@@ -111,7 +111,7 @@ public class ClientRestController {
      * @param companyId
      * @return
      */
-    @RequestMapping("/users/edit")
+    @RequestMapping(value = "/users/edit", method = RequestMethod.POST)
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> editUser(
     		@RequestBody UserCreateDTO userCreateDTO) {

@@ -12,8 +12,9 @@ import org.springframework.data.repository.query.Param;
 /**
  * Created by stephan on 20.03.16.
  */
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<User> {
     User findByUsername(String username);
+    List<User> findByClient(com.dysi.AngryBoxClientManager.models.Client client);
 
     @Query("select new com.dysi.AngryBoxClientManager.dtos.UserCreateDTO("
     		+ " u.id, u.username, u.firstname, u.lastname)"
