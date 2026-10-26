@@ -7,7 +7,7 @@ import java.util.Calendar;
 
 @Entity
 @Table(name = "PAYMENT")
-public class Payment {
+public class Payment extends AuditableEntity {
 	
     @Id
     @Column(name = "ID")
@@ -17,15 +17,6 @@ public class Payment {
     // descuento
     @Column(name = "DISCOUNT")
     private Double discount;
-    
-    // fecha de baja
-    @Column(name = "REMOVEDATE")
-    private Calendar removeDate;
-    
-    // fecha de creacion
-    @Column(name = "CREATIONDATE")
-    private Calendar creationDate;
-    
     //fecha de pago
     @Column(name = "PAYMENTDATE")
     private Calendar paymentDate;
@@ -63,22 +54,6 @@ public class Payment {
 
     public void setDiscount(Double discount) {
         this.discount = discount;
-    }
-
-    public Calendar getRemoveDate() {
-        return removeDate;
-    }
-
-    public void setRemoveDate(Calendar removeDate) {
-        this.removeDate = removeDate;
-    }
-
-    public Calendar getCreationDate() {
-        return creationDate;
-    }
-
-    public void setCreationDate(Calendar creationDate) {
-        this.creationDate = creationDate;
     }
 
     public Calendar getPaymentDate() {

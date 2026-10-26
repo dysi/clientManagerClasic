@@ -39,7 +39,7 @@ Puede usarse configuración externa con `--spring.config.additional-location=fil
 
 No existe una cuenta de demostración ni bootstrap de administrador. La base debe contener una cuenta habilitada con contraseña BCrypt, rol `ROLE_ADMIN` y las autoridades que se vayan a asignar (`ROLE_USER`, `ROLE_ADMIN`, `ROLE_SELLER`). Los IDs de los roles dependen de la base y no se fijan desde la interfaz.
 
-La configuración heredada contiene valores de conexión y secreto que deben sustituirse mediante configuración externa y rotarse si se utilizaron. Este documento no reproduce sus valores. `ddl-auto=update` puede modificar el esquema al arrancar; validar primero una copia del entorno y usar `SPRING_JPA_HIBERNATE_DDLAUTO=validate` cuando corresponda. No hay migraciones versionadas.
+La configuración heredada contiene valores de conexión y secreto que deben sustituirse mediante configuración externa y rotarse si se utilizaron. Este documento no reproduce sus valores. `ddl-auto=update` puede modificar el esquema al arrancar; validar primero una copia del entorno y usar `SPRING_JPA_HIBERNATE_DDLAUTO=validate` cuando corresponda. Los cambios de base se versionan como scripts MySQL manuales en `src/main/resources/db/`; no se ejecutan automáticamente.
 
 ## Navegación y bienvenida
 
@@ -160,6 +160,26 @@ La política CSP de `/ui` restringe scripts y conexiones al mismo origen, bloque
 
 Una segunda cadena de seguridad mantiene los consumidores Bearer/JWT existentes (`/auth`, `/refresh`, `/user`, `/api/...`). El refactor no supone una auditoría completa de esos contratos. Los servicios y endpoints anteriores conservados deben revisarse antes de ampliar su uso; la interfaz migrada no depende de ellos.
 
+## Auditoría de entidades y cambios de base de datos
+
+`Payment`, `LicenseStatus`, `Client`, `License` y `User` heredan de `AuditableEntity` (`@MappedSuperclass`). Cada tabla dispone de:
+
+| Propiedad | Columna física | Comportamiento |
+| --- | --- | --- |
+| `creationDate` / `createdBy` | `creationdate` / `created_by_id` | Fecha y usuario de creación, inmutables en actualizaciones |
+| `modificationDate` / `modifiedBy` | `modificationdate` / `modified_by_id` | Última escritura de la entidad, incluida su creación |
+| `removeDate` / `removedBy` | `removedate` / `removed_by_id` | Anulación lógica; NULL mientras el registro esté activo |
+
+Los usuarios son relaciones LAZY a `User`, sin cascadas. `AuditEntityListener` resuelve el actor a partir del ID del principal de sesión/JWT y registra las fechas en los callbacks JPA, también en persistencias por cascada. No se aceptan metadatos de auditoría desde JSON ni se serializan sus relaciones con usuarios. Los DTO web conservan sus contratos; las fechas preexistentes de pagos y estados mantienen sus propiedades y columnas.
+
+`markRemoved()` anula y `restore()` reactiva. Repetir una anulación conserva la fecha y el actor originales; actualizar otros campos de un registro anulado tampoco los reemplaza. Reactivar limpia fecha/actor y una anulación posterior registra un nuevo evento. Esto no crea endpoints adicionales de anulación para clientes/licencias/usuarios ni cambia automáticamente sus reglas de habilitación o los filtros de negocio.
+
+Los registros históricos mantienen sus fechas conocidas y los datos desconocidos en NULL. Una escritura sin sesión registra fechas con actor NULL, sin inventar una cuenta de sistema. Los cambios exclusivos de roles marcan también al usuario como modificado. Las operaciones masivas JPQL/SQL y las modificaciones externas a JPA eluden los callbacks y requieren auditoría explícita. Se conserva el último evento de cada tipo; no es una tabla histórica de todas las revisiones.
+
+Antes de iniciar esta versión sobre una base existente, aplicar manualmente **`src/main/resources/db/20261026-01-auditoria-entidades.sql`**, primero sobre una copia del esquema. El script agrega los campos faltantes y las claves foráneas a usuario; conserva `payment.creationdate/removedate` y `licensestatus.creationdate/removedate` y no rellena fechas ni actores ficticios. Leer sus precondiciones de motor InnoDB, nombres físicos y tipo de ID. MySQL hace commit implícito de DDL; la serie no tiene rollback transaccional global. `ddl-auto=update` no sustituye este procedimiento y puede adelantarse al script: aplicar el SQL con la aplicación detenida y utilizar `validate` al arrancar contra el esquema preparado.
+
+Los cambios futuros de BD deben tener un archivo nuevo en `src/main/resources/db/`, con formato **`yyyyMMdd-NN-descripcion-breve.sql`**. La secuencia comienza en `01` cada día; antes de crear un archivo se revisan los números existentes y se toma el siguiente al máximo, sin repetir ni renumerar. Ejecutar por fecha y número secuencial. No hay Liquibase/Flyway ni ejecución automática de estos archivos al arrancar. Toda entidad nueva debe heredar la auditoría; `AGENTS.md` establece esta obligación.
+
 ## Desarrollo del frontend
 
 Con el backend iniciado y un Node compatible instalado, desde `frontend`:
@@ -177,7 +197,7 @@ Vite sirve desarrollo en localhost y proxifica `/clientmanager/web` al backend e
 
 `mvnw.cmd clean verify` comprueba Java 11, TypeScript, build Vite, Vitest, pruebas Java y empaquetado. H2 es una dependencia de pruebas y no forma parte del JAR de producción.
 
-- Java: contexto, compatibilidad JWT, roles, CSRF, rotación/logout de sesión, cuentas deshabilitadas, conservación de contacto, validación/paginación, redirecciones antiguas, unicidad y propietario de licencias, bloqueo idempotente, fechas/importes de pagos, anulación idempotente, contraseñas y vínculos usuario–cliente.
+- Java: auditoría de las cinco entidades, usuarios de sesión/JWT, cascadas, anulación/reactivación, datos históricos y metadatos JSON; contexto, compatibilidad JWT, roles, CSRF, rotación/logout de sesión, cuentas deshabilitadas, conservación de contacto, validación/paginación, redirecciones antiguas, unicidad y propietario de licencias, bloqueo idempotente, fechas/importes de pagos, anulación idempotente, contraseñas y vínculos usuario–cliente.
 - Vitest: borradores de clientes, cancelación, errores por campo, contrato HTTP/CSRF y conservación de fechas locales.
 - Playwright: acceso, cookie de sesión, alta/edición de los cuatro módulos, descarte confirmado, persistencia tras recarga, bloqueo/desbloqueo, anulación/reactivación, cambio de contraseña, permisos y adaptación móvil.
 
@@ -198,7 +218,7 @@ El recorrido crea y modifica datos, por lo que no debe ejecutarse contra producc
 1. Revisar autorización por propietario en `/api/clients/license`, que acepta un nombre de usuario solicitado; comprobar también cuentas deshabilitadas en la validación JWT externa.
 2. Revisar renovación JWT, tratamiento de tokens inválidos/vencidos e invalidación de contraseñas en los servicios antiguos. Las correcciones del flujo web no sustituyen esa revisión.
 3. Sustituir servicios antiguos que editan usuarios/pagos con contratos ambiguos, documentando primero a sus consumidores externos.
-4. Incorporar migraciones de esquema, restricciones de unicidad y asociación, dinero DECIMAL y una regla explícita para estados históricos de licencia.
+4. Mantener el registro de ejecución de los scripts MySQL y ampliar las migraciones con restricciones de unicidad/asociación, dinero DECIMAL y una regla explícita para estados históricos de licencia.
 5. Validar esquema MySQL real, copias de respaldo, configuración de proxy/HTTPS y compatibilidad con AngryBox antes del despliegue.
 6. Planificar actualización posterior de Java/Spring Boot y dependencias del backend; Java 11 y Boot 2.7 son la base de compatibilidad solicitada, no una actualización a las versiones mayores más recientes.
 7. Medir consultas JPA, mejorar logs y ampliar pruebas de concurrencia, accesibilidad y carga según el uso real.
@@ -207,6 +227,6 @@ El análisis no aporta una necesidad demostrada de microservicios. La separació
 
 ## Resultado de la entrega (26/10/2026)
 
-Verificado con JDK 11: **`mvnw.cmd clean verify` — BUILD SUCCESS**, **15 pruebas Java**, **25 pruebas Vitest** y **3 recorridos Playwright completos** aprobados. La auditoría npm informó **0 vulnerabilidades**. Se revisaron capturas de escritorio y móvil y se comprobó que el JAR no contiene las plantillas, assets ni dependencias visuales retiradas. El recorrido se ejecutó sobre el JAR generado, con H2 y datos temporales externos, y cerró el proceso al finalizar.
+Verificado con JDK 11: **`mvnw.cmd clean verify` — BUILD SUCCESS**, **22 pruebas Java**, **25 pruebas Vitest** y **3 recorridos Playwright completos** aprobados. La auditoría npm informó **0 vulnerabilidades**. Se revisaron capturas de escritorio y móvil y se comprobó que el JAR no contiene las plantillas, assets ni dependencias visuales retiradas. El recorrido se ejecutó sobre el JAR generado, con H2 y datos temporales externos, y cerró el proceso al finalizar.
 
 No se conectó a MySQL ni se verificaron el esquema de producción, sus datos existentes o el consumidor AngryBox. Esas comprobaciones siguen siendo necesarias antes del despliegue en ese entorno.

@@ -7,21 +7,12 @@ import java.util.Calendar;
 
 @Entity
 @Table(name = "LICENSESTATUS")
-public class LicenseStatus {
+public class LicenseStatus extends AuditableEntity {
 	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
-
-    // fecha baja
-    @Column(name = "REMOVEDATE")
-    private Calendar removeDate;
-    
-    // fecha cracion
-    @Column(name = "CREATIONDATE")
-    private Calendar creationDate;
-    
     @Column(name = "OBSERVATION")
     private String observation;
     
@@ -45,22 +36,6 @@ public class LicenseStatus {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public Calendar getRemoveDate() {
-        return removeDate;
-    }
-
-    public void setRemoveDate(Calendar removeDate) {
-        this.removeDate = removeDate;
-    }
-
-    public Calendar getCreationDate() {
-        return creationDate;
-    }
-
-    public void setCreationDate(Calendar creationDate) {
-        this.creationDate = creationDate;
     }
 
     public String getObservation() {

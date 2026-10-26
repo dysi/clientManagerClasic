@@ -212,6 +212,7 @@ class WebFrontendTests {
                 .header(browser.header, browser.token).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(header().exists("Location")).andReturn();
         long id = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        assertEquals("browser-admin", clients.findById(id).orElseThrow().getCreatedBy().getUsername());
         mvc.perform(put("/web/api/clients/" + id).session(browser.session)
                 .header(browser.header, browser.token).contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("Pérez", "Gómez")))

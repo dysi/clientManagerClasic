@@ -69,7 +69,6 @@ public class PaymentServiceImpl implements PaymentService {
 			}
 		} else {
 			//NUEVO
-			paymentEdit.setCreationDate(Calendar.getInstance());
 			paymentEdit.setLicense(licenseEdit);
 			payments.add(paymentEdit);
 		}

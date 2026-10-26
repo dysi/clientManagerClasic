@@ -8,7 +8,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "CLIENT")
-public class Client {
+public class Client extends AuditableEntity {
 	
     @Id
     @Column(name = "ID")

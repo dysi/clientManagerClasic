@@ -80,7 +80,7 @@ public class WebAdminService {
         if (license.getLicenseStatuses() == null) license.setLicenseStatuses(new ArrayList<>());
         LicenseStatus state = currentState(license);
         if (state == null) {
-            state = new LicenseStatus(); state.setLicense(license); state.setCreationDate(Calendar.getInstance());
+            state = new LicenseStatus(); state.setLicense(license);
             state.setForcedLock(false); state.setLimitTransaction(9999999L); state.setObservation("");
             license.getLicenseStatuses().add(state);
         }
@@ -124,7 +124,6 @@ public class WebAdminService {
         if (payment.getRemoveDate() != null) conflict("Reactivá el pago antes de editarlo.");
         if (id != null && !payment.getLicense().getId().equals(input.licenseId)) bad("Un pago existente no puede cambiar de licencia.");
         payment.setLicense(findLicense(input.licenseId));
-        if (id == null) payment.setCreationDate(Calendar.getInstance());
         payment.setAmount(input.amount.doubleValue()); payment.setDiscount(input.discount.doubleValue());
         payment.setPaymentDate(calendar(input.paymentDate)); payment.setExpirationDate(calendar(input.expirationDate));
         payment.setPaymentRealDate(calendar(input.paymentRealDate)); payment.setObservation(input.observation.trim());

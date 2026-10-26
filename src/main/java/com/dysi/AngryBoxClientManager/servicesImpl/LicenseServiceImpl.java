@@ -98,8 +98,6 @@ public class LicenseServiceImpl implements LicenseService {
 			LicenseStatus licenciaBase = new LicenseStatus();
 			
 			licenciaBase.setLicense(licenseEdit);
-			
-			licenciaBase.setCreationDate(Calendar.getInstance());
 			licenciaBase.setForcedLock(false);
 			licenciaBase.setLimitTransaction(9999999l);
 			

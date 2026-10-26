@@ -99,12 +99,33 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 - Paginar y filtrar en base de datos; reutilizar `JpaSpecificationExecutor` y las consultas existentes. Mantener los límites actuales del contrato web o cambiar sus consumidores y pruebas explícitamente.
 - Parametrizar JPQL/SQL y escapar comodines cuando la búsqueda deba ser literal. No concatenar entradas externas ni cargar todo el listado para paginarlo en memoria.
 
+### Auditoría obligatoria de entidades
+
+- Toda entidad nueva debe extender `models/AuditableEntity` y persistir fecha/usuario de creación, modificación y anulación. La base ya se aplica a `Payment`, `LicenseStatus`, `Client`, `License` y `User`; no duplicar estos campos en las subclases.
+- `creationDate` y `createdBy` se asignan al persistir y son inmutables en actualizaciones. `modificationDate` y `modifiedBy` se actualizan mediante `AuditEntityListener` en escrituras JPA.
+- `removeDate` y `removedBy` representan anulación lógica. Usar `markRemoved()`/`setRemoveDate(...)`; repetir la anulación conserva el primer evento. `restore()`/`setRemoveDate(null)` limpia ambos campos. Una nueva anulación posterior registra un evento nuevo.
+- El actor se resuelve desde el ID persistido del principal autenticado (sesión o JWT), mediante una referencia LAZY a `User`, sin consultas ni cascadas durante el flush. No aceptar usuarios o fechas de auditoría desde el JSON ni serializar los grafos de actores. En pruebas de escritura autenticada, usar el login real o un principal con ID persistido; un `@WithMockUser` genérico sin ID no representa al actor del sistema.
+- Sin autenticación, el usuario de auditoría queda NULL, sin inventar cuentas. Los datos históricos desconocidos permanecen NULL; no atribuirlos al operador que ejecuta una migración o una edición posterior.
+- Las modificaciones exclusivas de tablas de asociación pueden no disparar `PreUpdate` del propietario. Invocar `markModified()` cuando corresponda; `User.setAuthorities` ya contempla este caso.
+- UPDATE/DELETE masivos JPQL, SQL nativo y SQL externo eluden los listeners JPA. Evitarlos para operaciones de negocio o actualizar la auditoría explícitamente, con pruebas. La anulación no es un DELETE físico ni un historial completo de todas las versiones del registro.
+- Agregar el script MySQL correspondiente al introducir una entidad o modificar sus campos; las referencias de auditoría no deben tener cascada de persistencia/eliminación sobre el usuario.
+
+### Scripts de cambios de base de datos
+
+- Siempre que se altere la base de datos, agregar un script nuevo de queries MySQL en `src/main/resources/db/`.
+- Formato obligatorio: `yyyyMMdd-NN-descripcion-breve.sql`. Usar la fecha del cambio, secuencia de al menos dos dígitos y descripción breve con guiones; por ejemplo `20261026-01-auditoria-entidades.sql`.
+- La secuencia comienza en `01` para cada fecha. Antes de crear un script, revisar todos los archivos de ese día y utilizar el número siguiente al mayor existente. No repetir números ni renumerar archivos anteriores.
+- La ejecución se ordena por fecha y valor numérico de la secuencia: `yyyyMMdd-01-...`, `yyyyMMdd-02-...`, `yyyyMMdd-03-...`. No sobrescribir scripts ya versionados o aplicados; corregir mediante uno nuevo.
+- Son scripts manuales versionados: no existe un ejecutor automático de migraciones. No incorporarlos a `schema.sql`, `data.sql` ni al arranque automático de Spring para ejecutarlos incidentalmente.
+- Incluir alcance, precondiciones de esquema/motor/tipos, conservación de datos y consultas de verificación. MySQL hace commit implícito de DDL; no prometer rollback transaccional global de una serie de ALTER TABLE.
+- Ejecutar primero sobre una copia compatible de MySQL y documentar limitaciones. Generar un script no autoriza aplicarlo a una base compartida o de producción.
+
 ### Transacciones y esquema
 
 - Definir transacciones en servicios y usar `@Transactional(readOnly = true)` para lecturas. Las operaciones compuestas de asociaciones deben ser atómicas.
 - Revisar lado propietario, cascadas y `orphanRemoval` antes de cambiar relaciones. No resolver N+1 convirtiendo todas las asociaciones a EAGER.
 - Preservar nombres físicos y comportamiento de generadores de IDs necesarios para el esquema existente.
-- No hay Liquibase ni Flyway configurado. No inventar changelogs, comandos de migración o garantías de esquema inexistentes.
+- No hay Liquibase ni Flyway configurado. Los cambios de esquema se versionan como scripts MySQL manuales en `src/main/resources/db/`, según la convención anterior.
 - `ddl-auto=update` está presente en la configuración normal y puede modificar MySQL. Antes de ejecutar la aplicación, verificar el destino y las propiedades efectivas; no usar una base compartida para pruebas.
 - Un cambio de esquema requiere definir migración reproducible, compatibilidad con datos existentes y validación; H2 no demuestra por sí solo compatibilidad con MySQL.
 - No recrear bases con datos, ejecutar restauraciones ni aplicar correcciones destructivas sin autorización explícita y estrategia de recuperación.

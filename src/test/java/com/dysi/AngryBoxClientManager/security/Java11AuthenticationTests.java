@@ -34,6 +34,29 @@ class Java11AuthenticationTests {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JwtTokenUtil tokens;
+    @Autowired private com.dysi.AngryBoxClientManager.repositories.AuthorityRepository authorities;
+    @Autowired private com.dysi.AngryBoxClientManager.repositories.ClientRepository clients;
+
+    @Test
+    void bearerWritesUseThePersistentAuthenticatedAuditActor() throws Exception {
+        var role = new com.dysi.AngryBoxClientManager.models.Authority();
+        role.setName(com.dysi.AngryBoxClientManager.models.AuthorityName.ROLE_ADMIN); authorities.saveAndFlush(role);
+        User user = new User(); user.setUsername("audit-bearer"); user.setFirstname("Audit"); user.setLastname("Bearer");
+        user.setEmail("audit-bearer@example.test"); user.setEnabled(true);
+        user.setPassword(passwordEncoder.encode("BearerAuditOnly123!")); user.setAuthorities(new java.util.ArrayList<>(java.util.List.of(role)));
+        users.saveAndFlush(user);
+        String login = mockMvc.perform(post("/auth").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"audit-bearer\",\"password\":\"BearerAuditOnly123!\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String token = objectMapper.readTree(login).get("token").asText();
+        mockMvc.perform(post("/api/clients/edit").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"firstname\":\"Bearer client\",\"lastname\":\"Audit\",\"email\":\"bearer-client@example.test\",\"phone\":\"1234\",\"cuil\":\"\"}"))
+                .andExpect(status().isOk());
+        var created = clients.findAll().stream().filter(client -> "Bearer client".equals(client.getFirstname())).findFirst().orElseThrow();
+        assertEquals(user.getId(), created.getCreatedBy().getId());
+        assertEquals(user.getId(), created.getModifiedBy().getId());
+    }
 
     @Test
     void loginGeneratesTokenUsableOnProtectedEndpoint() throws Exception {
