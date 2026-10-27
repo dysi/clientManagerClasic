@@ -1,4 +1,13 @@
 import { request } from "./http";
+export interface PaymentCounts {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+}
+export function paymentCounts(params: URLSearchParams) {
+  return request<PaymentCounts>(`/web/api/payments/counts?${params}`);
+}
 export interface License {
   id: number;
   clientId: number;
@@ -25,17 +34,15 @@ export type LicenseInput = Pick<
 >;
 export interface Payment {
   id: number;
-  licenseId: number;
-  companyName: string;
+  clientId: number;
+  clientName: string;
+  licenseId: number | null;
+  companyName: string | null;
   amount: number;
-  discount: number;
-  paymentDate: string;
-  expirationDate: string | null;
-  paymentRealDate: string | null;
-  observation: string;
-  removed: boolean;
+  currency: "ARS";
+  issuedAt: string;
+  status: "PENDIENTE" | "APROBADO" | "RECHAZADO";
 }
-export type PaymentInput = Omit<Payment, "id" | "companyName" | "removed">;
 export interface User {
   id: number;
   username: string;

@@ -22,3 +22,10 @@ export function money(value: number) {
     currency: "ARS",
   }).format(value);
 }
+
+/** Fecha/hora de calendario del contrato, sin convertirla a UTC ni cambiar de día. */
+export function displayDateTime(value: string | null | undefined) {
+  if (!value) return "Sin fecha";
+  const [date = "", time = ""] = value.split("T");
+  return `${displayDate(date)} ${time.slice(0, 5)}`.trim();
+}

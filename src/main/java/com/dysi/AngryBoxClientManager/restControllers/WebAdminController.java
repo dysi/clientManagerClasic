@@ -31,8 +31,17 @@ public class WebAdminController {
 
     @GetMapping("/payments") public Page<PaymentView> payments(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long licenseId, @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return service.payments(keyword, licenseId, status, page, size);
+        return service.payments(keyword, licenseId, status, clientId, from, to, page, size);
+    }
+    @GetMapping("/payments/counts") public PaymentCounts paymentCounts(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) Long licenseId, @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return service.paymentCounts(keyword, licenseId, clientId, from, to);
     }
     @GetMapping("/payments/{id}") public PaymentView payment(@PathVariable long id) { return service.payment(id); }
     @PostMapping("/payments") @ResponseStatus(HttpStatus.CREATED)

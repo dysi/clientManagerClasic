@@ -2,13 +2,25 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import { session } from "./features/auth/session";
 import {
   homePath,
+  entryPath,
+  sessionHome,
+  isPortalPath,
   loginLocation,
   returnPath,
 } from "./features/auth/navigation";
 export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: "/", redirect: homePath },
+    { path: "/", redirect: entryPath },
+    {
+      path: "/access",
+      component: () => import("./features/auth/LoginPage.vue"),
+      props: { documentMode: true },
+    },
+    { path: "/portal", component: () => import("./features/portal/PortalWelcomePage.vue") },
+    { path: "/portal/payments/new", component: () => import("./features/portal/PortalPaymentPage.vue") },
+    { path: "/portal/payments/:id", component: () => import("./features/portal/PortalPaymentDetailPage.vue") },
+    { path: "/portal/payments/:id/comments", component: () => import("./features/portal/PortalCommentsPage.vue") },
     {
       path: "/login",
       component: () => import("./features/auth/LoginPage.vue"),
@@ -50,6 +62,10 @@ export const router = createRouter({
       component: () => import("./features/payments/PaymentFormPage.vue"),
     },
     {
+      path: "/payments/:id",
+      component: () => import("./features/payments/PaymentReviewPage.vue"),
+    },
+    {
       path: "/payments/:id/edit",
       component: () => import("./features/payments/PaymentFormPage.vue"),
     },
@@ -69,11 +85,21 @@ export const router = createRouter({
       path: "/users/:id/password",
       component: () => import("./features/users/PasswordPage.vue"),
     },
-    { path: "/:pathMatch(.*)*", redirect: homePath },
+    { path: "/parameters", component: () => import("./features/parameters/ParametersPage.vue") },
+    { path: "/parameters/banks", component: () => import("./features/parameters/BanksPage.vue") },
+    { path: "/parameters/banks/new", component: () => import("./features/parameters/BankFormPage.vue") },
+    { path: "/parameters/banks/:id/edit", component: () => import("./features/parameters/BankFormPage.vue") },
+    { path: "/parameters/bank-accounts", component: () => import("./features/parameters/BankAccountsPage.vue") },
+    { path: "/parameters/bank-accounts/new", component: () => import("./features/parameters/BankAccountFormPage.vue") },
+    { path: "/parameters/bank-accounts/:id/edit", component: () => import("./features/parameters/BankAccountFormPage.vue") },
+    { path: "/:pathMatch(.*)*", redirect: entryPath },
   ],
 });
 router.beforeEach((to) => {
-  if (to.path !== "/login" && !session.user) return loginLocation(to.fullPath);
-  if (to.path === "/login" && session.user)
+  const publicEntry = to.path === "/login" || to.path === "/access";
+  if (!publicEntry && !session.user) return loginLocation(to.fullPath);
+  if (publicEntry && session.user)
     return returnPath(to.query.redirect, router);
+  if (session.user?.access === "PORTAL" && !isPortalPath(to.path)) return sessionHome();
+  if (session.user?.access === "ADMIN" && isPortalPath(to.path)) return homePath;
 });

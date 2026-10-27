@@ -26,7 +26,8 @@ test("entrada por el puerto, bienvenida, destino solicitado y sesión vencida", 
   };
   await page.goto(entry);
   await expect(welcome).toBeVisible();
-  await expect(page).toHaveURL(/\/ui\/#\/login$/);
+  await expect(page).toHaveURL(/\/ui\/#\/access$/);
+  await page.getByRole("link", { name: "Ingreso para usuarios", exact: true }).click();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
     path: "../target/portal-login-desktop.png",

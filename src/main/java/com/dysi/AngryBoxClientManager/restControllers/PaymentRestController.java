@@ -17,7 +17,7 @@ import com.dysi.AngryBoxClientManager.dtos.LicensePaymentsPaginationDTO;
 import com.dysi.AngryBoxClientManager.dtos.PaymentDTO;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.License;
-import com.dysi.AngryBoxClientManager.models.Payment;
+import com.dysi.AngryBoxClientManager.dtos.AdminViews.PaymentView;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.LicenseService;
 import com.dysi.AngryBoxClientManager.services.PaymentService;
@@ -53,6 +53,8 @@ public class PaymentRestController {
             }
 
             return new ResponseEntity<LicensePaymentsPaginationDTO>(lppDTO, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<LicensePaymentsPaginationDTO>(HttpStatus.FORBIDDEN);
         }
@@ -67,6 +69,8 @@ public class PaymentRestController {
             List<License> licenses = this.licenseService.getLicensesFromClient(client);
 
             return new ResponseEntity<List<License>>(licenses, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<List<License>>(HttpStatus.BAD_REQUEST);
         }
@@ -81,6 +85,8 @@ public class PaymentRestController {
         	resultado = this.licenseService.licenciaBloquear(licenciaID);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
         	return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
@@ -88,15 +94,17 @@ public class PaymentRestController {
     
     @RequestMapping("/payments/paymentsByLicense")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<List<Payment>> getPaymentsPaginatedByCompany(
+    public ResponseEntity<List<PaymentView>> getPaymentsPaginatedByCompany(
             @RequestParam(value = "licenseId", required = true) Long licenseId) {
         try {
             
-        	List<Payment> payments = this.paymentService.getLicensePayments(licenseId);
+            List<PaymentView> payments = this.paymentService.getLicensePayments(licenseId);
 
-            return new ResponseEntity<List<Payment>>(payments, HttpStatus.OK);
+            return new ResponseEntity<List<PaymentView>>(payments, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
-            return new ResponseEntity<List<Payment>>(HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<List<PaymentView>>(HttpStatus.BAD_REQUEST);
         }
     }
     
@@ -109,6 +117,8 @@ public class PaymentRestController {
         	String resultado = this.licenseService.editLicencia(license);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
@@ -123,6 +133,8 @@ public class PaymentRestController {
         	String resultado = this.paymentService.editPayment(Payment);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
@@ -137,6 +149,8 @@ public class PaymentRestController {
         	resultado = this.paymentService.pagoBaja(pagoID);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
         	return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }

@@ -4,7 +4,6 @@ import com.dysi.AngryBoxClientManager.dtos.AdminInputs.*;
 import com.dysi.AngryBoxClientManager.dtos.AdminViews.*;
 import com.dysi.AngryBoxClientManager.models.*;
 import com.dysi.AngryBoxClientManager.repositories.*;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
@@ -41,7 +40,8 @@ public class WebAdminService {
             List<Predicate> filters = new ArrayList<>();
             Join<License, Client> client = root.join("client", JoinType.LEFT);
             filters.add(cb.or(like(cb, root.get("companyName"), keyword), like(cb, root.get("description"), keyword),
-                    like(cb, cb.concat(cb.concat(client.get("firstname"), " "), client.get("lastname")), keyword)));
+                    like(cb, cb.concat(cb.concat(client.get("firstname"), " "), client.get("lastname")), keyword),
+                    like(cb, client.get("legalName"), keyword), like(cb, client.get("tradeName"), keyword)));
             if (clientId != null) filters.add(cb.equal(client.get("id"), clientId));
             if (!"ALL".equals(status)) {
                 Join<License, LicenseStatus> state = root.join("licenseStatuses");
@@ -62,7 +62,7 @@ public class WebAdminService {
             }
             return cb.and(filters.toArray(new Predicate[0]));
         };
-        return licenses.findAll(specification, paging).map(this::licenseView);
+        return licenses.findAll(specification, paging).map(WebAdminService::licenseView);
     }
 
     public LicenseView license(long id) { return licenseView(findLicense(id)); }
@@ -99,43 +99,78 @@ public class WebAdminService {
     }
 
     public Page<PaymentView> payments(String keyword, Long licenseId, String status, int page, int size) {
-        Pageable paging = page(page, size, keyword, "paymentDate", "id");
-        if (!Set.of("ALL", "PENDING", "PAID", "REMOVED").contains(status)) bad("Estado de pago inválido.");
-        return payments.findAll((Specification<Payment>) (root, query, cb) -> {
-            Join<Payment, License> license = root.join("license");
+        return payments(keyword, licenseId, status, null, null, null, page, size);
+    }
+
+    public Page<PaymentView> payments(String keyword, Long licenseId, String status, Long clientId,
+            LocalDate from, LocalDate to, int page, int size) {
+        page(page, size, keyword, "issuedAt", "id");
+        Set<PaymentStatus> selected = paymentStatuses(status);
+        Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, from, to);
+        if (!selected.isEmpty()) specification = specification.and((root, query, cb) -> root.get("status").in(selected));
+        return payments.findAll(specification, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "issuedAt", "id"))).map(WebAdminService::paymentView);
+    }
+
+    /** Los contadores conservan los filtros de contexto, sin restringirse a los estados seleccionados. */
+    public PaymentCounts paymentCounts(String keyword, Long licenseId, Long clientId, LocalDate from, LocalDate to) {
+        page(0, 50, keyword, "id");
+        Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, from, to);
+        PaymentCounts counts = new PaymentCounts();
+        counts.pending = countPayments(specification, PaymentStatus.PENDIENTE);
+        counts.approved = countPayments(specification, PaymentStatus.APROBADO);
+        counts.rejected = countPayments(specification, PaymentStatus.RECHAZADO);
+        counts.total = counts.pending + counts.approved + counts.rejected;
+        return counts;
+    }
+
+    private long countPayments(Specification<Payment> specification, PaymentStatus status) {
+        return payments.count(specification.and((root, query, cb) -> cb.equal(root.get("status"), status)));
+    }
+
+    private static Set<PaymentStatus> paymentStatuses(String status) {
+        Set<PaymentStatus> selected = EnumSet.noneOf(PaymentStatus.class);
+        if (status == null || status.isEmpty() || "ALL".equals(status)) return selected;
+        for (String value : status.split(",", -1)) {
+            try { selected.add(PaymentStatus.valueOf(value)); }
+            catch (IllegalArgumentException invalid) { bad("Estado de pago inválido."); }
+        }
+        return selected;
+    }
+
+    private Specification<Payment> paymentFilters(String keyword, Long licenseId, Long clientId, LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) bad("La fecha desde no puede ser posterior a hasta.");
+        if ((from != null && (from.getYear() < 1000 || from.getYear() > 9999))
+                || (to != null && (to.getYear() < 1000 || to.getYear() > 9998))) bad("Rango de fechas inválido.");
+        return (root, query, cb) -> {
+            Join<Payment, License> license = root.join("license", JoinType.LEFT);
+            Join<Payment, Client> client = root.join("client");
             List<Predicate> filters = new ArrayList<>();
-            filters.add(cb.or(like(cb, license.get("companyName"), keyword), like(cb, root.get("observation"), keyword)));
+            filters.add(cb.or(like(cb, license.get("companyName"), keyword),
+                    like(cb, cb.concat(cb.concat(client.get("firstname"), " "), client.get("lastname")), keyword),
+                    like(cb, client.get("legalName"), keyword), like(cb, client.get("tradeName"), keyword)));
+            filters.add(cb.isNull(root.get("removeDate")));
+            if (clientId != null) filters.add(cb.equal(client.get("id"), clientId));
+            if (from != null) filters.add(cb.greaterThanOrEqualTo(root.get("issuedAt"), from.atStartOfDay()));
+            if (to != null) filters.add(cb.lessThan(root.get("issuedAt"), to.plusDays(1).atStartOfDay()));
             if (licenseId != null) filters.add(cb.equal(license.get("id"), licenseId));
-            if ("REMOVED".equals(status)) filters.add(cb.isNotNull(root.get("removeDate")));
-            else if (!"ALL".equals(status)) {
-                filters.add(cb.isNull(root.get("removeDate")));
-                filters.add("PAID".equals(status) ? cb.isNotNull(root.get("paymentRealDate")) : cb.isNull(root.get("paymentRealDate")));
-            }
             return cb.and(filters.toArray(new Predicate[0]));
-        }, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "paymentDate", "id"))).map(this::paymentView);
+        };
     }
 
     public PaymentView payment(long id) { return paymentView(findPayment(id)); }
 
+    /** El formulario anterior no tiene los datos ni las evidencias del nuevo contrato. */
     @Transactional
     public PaymentView savePayment(Long id, PaymentInput input) {
-        if (input.discount.compareTo(input.amount) > 0) bad("El descuento no puede superar el importe.");
-        Payment payment = id == null ? new Payment() : findPayment(id);
-        if (payment.getRemoveDate() != null) conflict("Reactivá el pago antes de editarlo.");
-        if (id != null && !payment.getLicense().getId().equals(input.licenseId)) bad("Un pago existente no puede cambiar de licencia.");
-        payment.setLicense(findLicense(input.licenseId));
-        payment.setAmount(input.amount.doubleValue()); payment.setDiscount(input.discount.doubleValue());
-        payment.setPaymentDate(calendar(input.paymentDate)); payment.setExpirationDate(calendar(input.expirationDate));
-        payment.setPaymentRealDate(calendar(input.paymentRealDate)); payment.setObservation(input.observation.trim());
-        return paymentView(payments.saveAndFlush(payment));
+        if (id != null) findPayment(id);
+        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Usá el flujo de presentación de pagos. Esta operación no admite edición genérica.");
     }
 
     @Transactional
     public PaymentView paymentStatus(long id, boolean removed) {
-        Payment payment = findPayment(id);
-        if (removed && payment.getRemoveDate() == null) payment.setRemoveDate(Calendar.getInstance());
-        if (!removed) payment.setRemoveDate(null);
-        return paymentView(payments.saveAndFlush(payment));
+        findPayment(id);
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Los pagos no admiten anulación ni reactivación.");
     }
 
     public Page<UserView> users(String keyword, Long clientId, int page, int size) {
@@ -200,14 +235,21 @@ public class WebAdminService {
 
     public List<Option> clientOptions(String keyword) {
         return clients.searchForWeb(pattern(keyword), page(0, 20, keyword, "lastname", "id")).getContent().stream()
-                .map(c -> new Option(c.getId(), clientName(c))).collect(Collectors.toList());
+                .map(c -> new Option(c.getId(), clientOptionLabel(c))).collect(Collectors.toList());
+    }
+    private static String clientOptionLabel(Client client) {
+        List<String> names = new ArrayList<>();
+        names.add(clientName(client));
+        if (client.getTradeName() != null) names.add(client.getTradeName());
+        if (client.getLegalName() != null) names.add(client.getLegalName());
+        return String.join(" · ", names);
     }
     public List<Option> licenseOptions(String keyword) {
         return licenses(keyword, null, "ALL", 0, 20).getContent().stream()
                 .map(l -> new Option(l.id, l.companyName + " · Empresa #" + l.companyId)).collect(Collectors.toList());
     }
 
-    private LicenseView licenseView(License license) {
+    static LicenseView licenseView(License license) {
         LicenseView view = new LicenseView();
         view.id = license.getId(); view.companyId = license.getCompanyId(); view.companyName = license.getCompanyName();
         view.description = license.getDescription(); view.clientId = license.getClient() == null ? null : license.getClient().getId();
@@ -220,11 +262,13 @@ public class WebAdminService {
                 : view.daysUntilLock <= 15 ? "EXPIRING" : "ACTIVE";
         return view;
     }
-    private PaymentView paymentView(Payment payment) {
-        PaymentView view = new PaymentView(); view.id = payment.getId(); view.licenseId = payment.getLicense().getId();
-        view.companyName = payment.getLicense().getCompanyName(); view.amount = decimal(payment.getAmount()); view.discount = decimal(payment.getDiscount());
-        view.paymentDate = date(payment.getPaymentDate()); view.expirationDate = date(payment.getExpirationDate());
-        view.paymentRealDate = date(payment.getPaymentRealDate()); view.observation = payment.getObservation(); view.removed = payment.getRemoveDate() != null;
+    public static PaymentView paymentView(Payment payment) {
+        PaymentView view = new PaymentView(); view.id = payment.getId();
+        view.clientId = payment.getClient().getId(); view.clientName = clientName(payment.getClient());
+        view.licenseId = payment.getLicense() == null ? null : payment.getLicense().getId();
+        view.companyName = payment.getLicense() == null ? null : payment.getLicense().getCompanyName();
+        view.amount = payment.getAmount(); view.currency = payment.getCurrency().name();
+        view.issuedAt = payment.getIssuedAt(); view.status = payment.getStatus().name();
         return view;
     }
     private UserView userView(User user) {
@@ -234,7 +278,7 @@ public class WebAdminService {
         view.clientId = user.getClient() == null ? null : user.getClient().getId(); view.clientName = clientName(user.getClient());
         return view;
     }
-    private LicenseStatus currentState(License license) {
+    private static LicenseStatus currentState(License license) {
         return license.getLicenseStatuses() == null ? null : license.getLicenseStatuses().stream().filter(s -> s.getRemoveDate() == null)
                 .min(Comparator.comparing(LicenseStatus::getId, Comparator.nullsLast(Comparator.naturalOrder()))).orElse(null);
     }
@@ -246,7 +290,6 @@ public class WebAdminService {
     private static String clientName(Client client) { return client == null ? "Sin cliente" : client.getFirstname() + " " + client.getLastname(); }
     private static Calendar calendar(LocalDate value) { return value == null ? null : GregorianCalendar.from(value.atStartOfDay(ZoneId.systemDefault())); }
     private static LocalDate date(Calendar value) { return value == null ? null : value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(); }
-    private static BigDecimal decimal(Double value) { return BigDecimal.valueOf(value == null ? 0 : value); }
     private static String pattern(String keyword) { return "%" + keyword.trim().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"; }
     private static Predicate like(CriteriaBuilder cb, Expression<String> field, String keyword) { return cb.like(cb.lower(cb.coalesce(field, "")), pattern(keyword), '!'); }
     private static Pageable page(int page, int size, String keyword, String... sort) {

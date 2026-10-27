@@ -9,6 +9,7 @@ test("licencias combina cliente, texto y estado; pagina 25/50/100 y resalta fila
   if (!baseURL || !process.env.E2E_USER || !process.env.E2E_PASSWORD)
     throw new Error("Configurar el entorno E2E aislado.");
   await page.goto(baseURL);
+  await page.getByRole("link", { name: "Ingreso para usuarios", exact: true }).click();
   await page.getByLabel(/^Usuario/).fill(process.env.E2E_USER);
   await page.getByLabel(/^Contraseña/).fill(process.env.E2E_PASSWORD);
   await page

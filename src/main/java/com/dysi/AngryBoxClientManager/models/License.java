@@ -7,7 +7,7 @@ import java.util.Calendar;
 import java.util.List;
 
 @Entity
-@Table(name = "LICENSE")
+@Table(name = "LICENSE", uniqueConstraints = @UniqueConstraint(name = "uk_license_client", columnNames = { "ID", "CLIENT_ID" }))
 public class License extends AuditableEntity {
 	
     @Id
@@ -35,7 +35,8 @@ public class License extends AuditableEntity {
     @ManyToOne
     private Client client;
 
-    @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
+    // Evidencias con ciclo de vida independiente de la licencia.
+    @OneToMany(mappedBy = "license")
     List<Payment> paymentList;
 
     @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)

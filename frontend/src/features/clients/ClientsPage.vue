@@ -28,7 +28,7 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
       <ListToolbar
         v-model="keyword"
         :loading="loading"
-        placeholder="Nombre, correo, CUIL o usuario"
+        placeholder="Nombre, razón social, fantasía, correo, CUIL o usuario"
         @search="search"
       />
       <DataTable
@@ -50,6 +50,8 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
               class="font-medium text-primary"
               >{{ data.lastname }}, {{ data.firstname }}</RouterLink
             >
+            <p v-if="data.tradeName" class="mt-1 break-words text-sm">{{ data.tradeName }}</p>
+            <p v-if="data.legalName" class="mt-1 break-words text-sm text-muted-color">{{ data.legalName }}</p>
             <p class="mt-1 text-sm text-muted-color">
               #{{ data.id }} ·
               {{
@@ -57,6 +59,9 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
                   ? "Sin usuario vinculado"
                   : data.username
               }}
+            </p>
+            <p v-if="data.portalUserMissing" class="mt-1 text-sm text-orange-700 dark:text-orange-300">
+              <i class="pi pi-exclamation-triangle" aria-hidden="true" /> Sin acceso al portal: vinculá un usuario.
             </p></template
           ></Column
         >

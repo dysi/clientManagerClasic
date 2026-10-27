@@ -64,9 +64,17 @@ public class WebClientController {
     private void fill(Client client, ClientInput input) {
         client.setFirstname(input.firstname.trim()); client.setLastname(input.lastname.trim());
         client.setEmail(input.email.trim()); client.setPhone(input.phone.trim()); client.setCuil(input.cuil.trim());
+        if (input.dni != null) client.setDni(input.dni.isEmpty() ? null : input.dni);
+        if (input.legalName != null) client.setLegalName(input.legalName);
+        if (input.tradeName != null) client.setTradeName(input.tradeName);
+        if (input.externalCode != null) client.setExternalCode(input.externalCode);
     }
     private ClientDTO dto(Client client) {
-        return new ClientDTO(client.getId(), client.getFirstname(), client.getLastname(), client.getEmail(),
+        ClientDTO result = new ClientDTO(client.getId(), client.getFirstname(), client.getLastname(), client.getEmail(),
                 client.getPhone(), client.getCuil(), client.getUser() == null ? null : client.getUser().getUsername());
+        result.setDni(client.getDni());
+        result.setLegalName(client.getLegalName()); result.setTradeName(client.getTradeName());
+        result.setExternalCode(client.getExternalCode());
+        return result;
     }
 }

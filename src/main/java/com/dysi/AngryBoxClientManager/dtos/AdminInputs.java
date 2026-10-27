@@ -1,7 +1,6 @@
 package com.dysi.AngryBoxClientManager.dtos;
 
 import com.dysi.AngryBoxClientManager.models.AuthorityName;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import javax.validation.constraints.*;
@@ -20,15 +19,8 @@ public final class AdminInputs {
         @NotNull public Boolean prePayment;
     }
 
-    public static class PaymentInput {
-        @NotNull @Positive public Long licenseId;
-        @NotNull @DecimalMin("0.00") @Digits(integer = 12, fraction = 2) public BigDecimal amount;
-        @NotNull @DecimalMin("0.00") @Digits(integer = 12, fraction = 2) public BigDecimal discount;
-        @NotNull public LocalDate paymentDate;
-        public LocalDate expirationDate;
-        public LocalDate paymentRealDate;
-        @NotNull @Size(max = 255) public String observation;
-    }
+    /** Contrato reservado; las escrituras permanecen cerradas hasta la etapa de presentación. */
+    public static class PaymentInput { }
 
     public static class UserInput {
         @NotBlank @Size(min = 4, max = 50) public String username;

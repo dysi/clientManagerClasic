@@ -1,187 +1,106 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute } from "vue-router";
+import { onMounted, onUnmounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
-import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
-import { useToast } from "primevue/usetoast";
 import PageHeader from "../../components/PageHeader.vue";
 import ListToolbar from "../../components/ListToolbar.vue";
 import ListPaginator from "../../components/ListPaginator.vue";
-import { useConfirmAction } from "../../composables/useConfirmAction";
+import FormField from "../../components/FormField.vue";
+import EntitySelect from "../../components/EntitySelect.vue";
+import DateInput from "../../components/DateInput.vue";
 import { usePagedList } from "../../composables/usePagedList";
-import { request } from "../../services/http";
-import { money, displayDate } from "../../services/format";
-import type { Payment } from "../../services/admin";
-const route = useRoute();
-const toast = useToast();
-const confirm = useConfirmAction();
-const licenseId = route.query.licenseId
-  ? Number(route.query.licenseId)
-  : undefined;
-const status = ref("ALL");
-const acting = ref<number>();
+import { displayDateTime, money } from "../../services/format";
+import { paymentCounts, type Payment, type PaymentCounts } from "../../services/admin";
+import { paymentLabels } from "./review";
+const route = useRoute(), router = useRouter();
+const licenseId = route.query.licenseId ? Number(route.query.licenseId) : undefined;
+const clientId = ref<number | null>(route.query.clientId ? Number(route.query.clientId) : null);
+const clientLabel = ref(typeof route.query.clientName === "string" ? route.query.clientName : "");
 const states = [
-  { label: "Todos", value: "ALL" },
-  { label: "Pendientes", value: "PENDING" },
-  { label: "Pagados", value: "PAID" },
-  { label: "Anulados", value: "REMOVED" },
-];
-const {
-  rows,
-  keyword,
-  loading,
-  error,
-  page,
-  size,
-  total,
-  load,
-  search,
-  paginate,
-} = usePagedList<Payment>("/web/api/payments", () => ({
-  status: status.value,
-  licenseId,
-}));
-async function changeStatus(payment: Payment) {
-  const removed = !payment.removed;
-  if (
-    !(await confirm(
-      `¿${removed ? "Anular" : "Reactivar"} el pago #${payment.id} de ${payment.companyName}?`,
-    ))
-  )
-    return;
-  acting.value = payment.id;
-  error.value = "";
+  { label: "Pendientes", value: "PENDIENTE", count: "pending", severity: "warn" },
+  { label: "Aprobados", value: "APROBADO", count: "approved", severity: "success" },
+  { label: "Rechazados", value: "RECHAZADO", count: "rejected", severity: "danger" },
+] as const;
+const statusQuery = typeof route.query.status === "string" ? route.query.status.split(",") : [];
+const selected = ref<string[]>(states.filter(state => statusQuery.includes(state.value)).map(state => state.value));
+const from = ref<string | null>(typeof route.query.from === "string" ? route.query.from : null);
+const to = ref<string | null>(typeof route.query.to === "string" ? route.query.to : null);
+const { rows, keyword, loading, error, page, size, total, load } = usePagedList<Payment>("/web/api/payments", () => ({ status: selected.value.join(","), licenseId, clientId: clientId.value, from: from.value, to: to.value }));
+keyword.value = typeof route.query.keyword === "string" ? route.query.keyword : "";
+page.value = /^\d+$/.test(String(route.query.page ?? "0")) ? Number(route.query.page ?? 0) : 0;
+size.value = [25,50,100].includes(Number(route.query.size)) ? Number(route.query.size) : 50;
+const counts = ref<PaymentCounts | null>(null);
+const countsLoading = ref(false), countsError = ref("");
+let countsSequence = 0;
+onUnmounted(() => { countsSequence++; });
+async function loadCounts() {
+  const sequence = ++countsSequence;
+  countsLoading.value = true;
+  countsError.value = "";
+  counts.value = null;
+  const params = new URLSearchParams({ keyword: keyword.value.trim() });
+  if (licenseId != null) params.set("licenseId", String(licenseId));
+  if (clientId.value != null) params.set("clientId", String(clientId.value));
+  if (from.value) params.set("from", from.value);
+  if (to.value) params.set("to", to.value);
   try {
-    await request(`/web/api/payments/${payment.id}/status`, {
-      method: "PUT",
-      body: JSON.stringify({ removed }),
-    });
-    toast.add({
-      severity: "success",
-      summary: removed ? "Pago anulado" : "Pago reactivado",
-      life: 3500,
-    });
-    await load();
+    const result = await paymentCounts(params);
+    if (sequence === countsSequence) counts.value = result;
   } catch (failure) {
-    error.value = (failure as Error).message;
+    if (sequence === countsSequence) countsError.value = failure instanceof Error ? failure.message : "No se pudieron cargar las cantidades.";
   } finally {
-    acting.value = undefined;
+    if (sequence === countsSequence) countsLoading.value = false;
   }
+}
+onMounted(loadCounts);
+function toggleStatus(value: string) {
+  selected.value = selected.value.includes(value) ? selected.value.filter(state => state !== value) : [...selected.value, value];
+  return navigate();
+}
+async function navigate(next = 0, count = size.value) {
+  const query: Record<string, string> = {};
+  if (keyword.value.trim()) query.keyword = keyword.value.trim();
+  if (selected.value.length) query.status = states.filter(state => selected.value.includes(state.value)).map(state => state.value).join(",");
+  if (clientId.value != null) { query.clientId = String(clientId.value); query.clientName = clientLabel.value; }
+  if (licenseId != null) { query.licenseId = String(licenseId); if (typeof route.query.companyName === "string") query.companyName = route.query.companyName; }
+  if (from.value) query.from = from.value; if (to.value) query.to = to.value;
+  if (next) query.page = String(next); if (count !== 50) query.size = String(count);
+  const target = router.resolve({ path: "/payments", query });
+  if (target.fullPath === route.fullPath) { page.value = next; size.value = count; await Promise.all([load(), loadCounts()]); }
+  else await router.replace(target.fullPath);
 }
 </script>
 <template>
-  <PageHeader
-    title="Pagos"
-    description="Registro de importes, vencimientos y cobros por licencia."
-    ><Button
-      as="router-link"
-      :to="{ path: '/payments/new', query: licenseId ? { licenseId } : {} }"
-      label="Nuevo pago"
-      icon="pi pi-plus"
-  /></PageHeader>
-  <Message v-if="licenseId" severity="info" class="mb-4"
-    >Pagos de {{ route.query.companyName || `la licencia #${licenseId}` }}.
-    <RouterLink to="/payments" class="underline">Ver todos</RouterLink></Message
-  >
-  <Message v-if="error" severity="error" class="mb-4">{{ error }}</Message>
-  <Card
-    ><template #content>
-      <ListToolbar
-        v-model="keyword"
-        :loading="loading"
-        placeholder="Empresa u observación"
-        @search="search"
-        ><Select
-          v-model="status"
-          :options="states"
-          option-label="label"
-          option-value="value"
-          aria-label="Estado del pago"
-          @change="search"
-      /></ListToolbar>
-      <DataTable
-        :value="rows"
-        :loading="loading"
-        data-key="id"
-        row-hover
-        striped-rows
-        scrollable
-      >
-        <template #empty>No se encontraron pagos con estos filtros.</template>
-        <Column header="Empresa / período"
-          ><template #body="{ data }"
-            ><span class="font-medium">{{ data.companyName }}</span>
-            <p class="mt-1 text-sm text-muted-color">
-              #{{ data.id }} · {{ displayDate(data.paymentDate) }}
-            </p></template
-          ></Column
-        >
-        <Column header="Importe neto"
-          ><template #body="{ data }"
-            >{{ money(data.amount - data.discount) }}
-            <p v-if="data.discount" class="mt-1 text-sm text-muted-color">
-              Descuento: {{ money(data.discount) }}
-            </p></template
-          ></Column
-        >
-        <Column header="Fechas"
-          ><template #body="{ data }"
-            ><p class="text-sm">
-              Vence: {{ displayDate(data.expirationDate) }}
-            </p>
-            <p class="mt-1 text-sm text-muted-color">
-              Cobrado: {{ displayDate(data.paymentRealDate) }}
-            </p></template
-          ></Column
-        >
-        <Column header="Estado"
-          ><template #body="{ data }"
-            ><Tag
-              :value="
-                data.removed
-                  ? 'Anulado'
-                  : data.paymentRealDate
-                    ? 'Pagado'
-                    : 'Pendiente'
-              "
-              :severity="
-                data.removed
-                  ? 'secondary'
-                  : data.paymentRealDate
-                    ? 'success'
-                    : 'warn'
-              " /></template
-        ></Column>
-        <Column header="Acciones"
-          ><template #body="{ data }"
-            ><div class="flex flex-wrap gap-1">
-              <Button
-                as="router-link"
-                :to="`/payments/${data.id}/edit`"
-                label="Editar"
-                text
-                size="small"
-                :disabled="data.removed"
-              /><Button
-                :label="data.removed ? 'Reactivar' : 'Anular'"
-                :severity="data.removed ? 'secondary' : 'danger'"
-                text
-                size="small"
-                :loading="acting === data.id"
-                :disabled="acting != null"
-                @click="changeStatus(data)"
-              /></div></template
-        ></Column> </DataTable
-      ><ListPaginator
-        :page="page"
-        :size="size"
-        :total="total"
-        @change="paginate"
-      /> </template
-  ></Card>
+  <PageHeader title="Pagos" description="Consulta y revisión administrativa de pagos informados." />
+  <Message v-if="licenseId" severity="info" class="mb-4">Pagos de {{ route.query.companyName || `la licencia #${licenseId}` }}. <RouterLink to="/payments" class="underline">Ver todos</RouterLink></Message>
+  <Message v-if="error" severity="error" role="alert" class="mb-4">{{ error }}</Message>
+  <Card><template #content>
+    <ListToolbar v-model="keyword" :loading="loading" placeholder="Cliente o empresa" @search="navigate()" />
+    <div role="group" aria-label="Estados del pago" :aria-busy="countsLoading" class="mt-4 flex flex-wrap gap-2">
+      <Button type="button" :label="`Todos (${counts?.total ?? '…'})`" severity="secondary" :outlined="selected.length > 0" :aria-pressed="selected.length === 0" @click="selected = []; navigate()" />
+      <Button v-for="state in states" :key="state.value" type="button" :label="`${state.label} (${counts?.[state.count] ?? '…'})`" :severity="state.severity" :outlined="!selected.includes(state.value)" :aria-pressed="selected.includes(state.value)" @click="toggleStatus(state.value)" />
+    </div>
+    <p class="mt-2 text-sm text-muted-color">Podés combinar estados. Sin estados seleccionados se muestran todos.</p>
+    <Message v-if="countsError" severity="error" role="alert" class="mt-2">{{ countsError }} <Button type="button" label="Reintentar cantidades" text size="small" @click="loadCounts" /></Message>
+    <div class="my-4 grid gap-4 md:grid-cols-3">
+      <FormField id="paymentClient" label="Cliente"><EntitySelect input-id="paymentClient" v-model="clientId" :label="clientLabel" kind="clients" @selected="clientLabel = $event?.label ?? ''" @update:model-value="navigate()" /><Button v-if="clientId != null" type="button" label="Quitar filtro de cliente" text size="small" @click="clientId = null; clientLabel = ''; navigate()" /></FormField>
+      <FormField id="paymentFrom" label="Emisión desde"><DateInput input-id="paymentFrom" v-model="from" @update:model-value="navigate()" /></FormField>
+      <FormField id="paymentTo" label="Emisión hasta"><DateInput input-id="paymentTo" v-model="to" @update:model-value="navigate()" /></FormField>
+    </div>
+    <DataTable :value="rows" :loading="loading" data-key="id" row-hover striped-rows scrollable>
+      <template #empty>No se encontraron pagos con estos filtros.</template>
+      <Column field="id" header="Referencia" /><Column field="clientName" header="Cliente" />
+      <Column header="Licencia"><template #body="{ data }">{{ data.companyName || 'Sin licencia asociada' }}</template></Column>
+      <Column header="Importe"><template #body="{ data }">{{ money(data.amount) }}</template></Column>
+      <Column header="Emisión"><template #body="{ data }">{{ displayDateTime(data.issuedAt) }}</template></Column>
+      <Column header="Estado"><template #body="{ data }: { data: Payment }"><Tag :value="paymentLabels[data.status]" :severity="data.status === 'APROBADO' ? 'success' : data.status === 'RECHAZADO' ? 'danger' : 'warn'" /></template></Column>
+      <Column header="Detalle"><template #body="{ data }"><Button as="router-link" :to="{ path: '/payments/' + data.id, query: { returnTo: route.fullPath } }" label="Revisar pago" icon="pi pi-eye" text size="small" /></template></Column>
+    </DataTable>
+    <ListPaginator :page="page" :size="size" :total="total" @change="navigate" />
+  </template></Card>
 </template>

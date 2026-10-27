@@ -46,6 +46,7 @@ test("administración completa con formularios separados y sesión segura", asyn
   }
   await page.goto("./");
   await expect(heading("Te damos la bienvenida")).toBeVisible();
+  await link("Ingreso para usuarios").click();
   await page.screenshot({
     path: "../target/frontend-login.png",
     fullPage: true,
@@ -67,7 +68,7 @@ test("administración completa con formularios separados y sesión segura", asyn
   expect(cookie?.httpOnly).toBe(true);
   expect(cookie?.sameSite).toBe("Lax");
   await link("Nuevo cliente").click();
-  await page.getByLabel(/^Nombre/).fill("Ana E2E");
+  await page.locator("#firstname").fill("Ana E2E");
   await page.getByLabel(/^Apellido/).fill("Verificación");
   await page
     .getByLabel("Correo electrónico", { exact: true })
@@ -77,7 +78,7 @@ test("administración completa con formularios separados y sesión segura", asyn
   await page.getByRole("button", { name: "Guardar cliente" }).click();
   await expect(heading("Ana E2E Verificación")).toBeVisible();
   await link("Editar datos").click();
-  await page.getByLabel(/^Nombre/).fill("Nombre descartado");
+  await page.locator("#firstname").fill("Nombre descartado");
   await page.getByRole("button", { name: "Cancelar", exact: true }).click();
   await confirm();
   await expect(heading("Ana E2E Verificación")).toBeVisible();
@@ -139,29 +140,12 @@ test("administración completa con formularios separados y sesión segura", asyn
     .getByRole("table")
     .getByRole("link", { name: "Pagos", exact: true })
     .click();
-  await link("Nuevo pago").click();
-  await expect(
-    page.getByRole("combobox", { name: "Licencia", exact: true }),
-  ).toHaveValue("Empresa E2E");
-  await page.getByLabel(/^Importe/).fill("1500");
-  await page.getByLabel(/^Descuento/).fill("100");
-  await page.getByLabel("Observaciones", { exact: true }).fill("Período E2E");
-  await page.getByRole("button", { name: "Guardar pago" }).click();
   await expect(heading("Pagos")).toBeVisible();
-  await expect(page.getByText("Pendiente", { exact: true })).toBeVisible();
-  await link("Editar").click();
-  await expect(page.getByLabel(/^Importe/)).toHaveValue(/1.500,00/);
-  await page
-    .getByLabel("Observaciones", { exact: true })
-    .fill("Observación actualizada");
-  await page.getByRole("button", { name: "Guardar pago" }).click();
-  await expect(heading("Pagos")).toBeVisible();
-  await page.getByRole("button", { name: "Anular", exact: true }).click();
-  await confirm();
-  await expect(page.getByText("Anulado", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Reactivar", exact: true }).click();
-  await confirm();
-  await expect(page.getByText("Pendiente", { exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Estados del pago", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Emisión desde", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Emisión hasta", { exact: true })).toBeVisible();
+  await expect(link("Nuevo pago")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Anular", exact: true })).toHaveCount(0);
   await captureModule("payments");
 
   await page.getByRole("menuitem", { name: "Usuarios", exact: true }).click();
@@ -206,10 +190,8 @@ test("administración completa con formularios separados y sesión segura", asyn
   await page.getByLabel(/^Usuario/).fill("e2e-user");
   await page.getByLabel(/^Contraseña/).fill("ReplacedPassword123!");
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(
-    page.getByText("Tu cuenta no tiene permisos de administración.", {
-      exact: false,
-    }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/#\/portal$/);
+  await expect(heading("Cuenta de Ana E2E Actualizada")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Usuarios", exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

@@ -45,7 +45,7 @@ Las versiones efectivas se consultan en `pom.xml`, `.mvn/wrapper/maven-wrapper.p
 - Backend: `src/main/java/com/dysi/AngryBoxClientManager/`.
 - Configuración: `src/main/resources/application*.properties` y `application.yml`.
 - Pruebas Java: `src/test/java/`; configuración aislada: `src/test/resources/application-test.properties`.
-- Frontend: `frontend/src/`; páginas por dominio en `features/{auth,clients,licenses,payments,users}/`.
+- Frontend: `frontend/src/`; páginas por dominio en `features/{auth,clients,licenses,payments,users,parameters,portal}/`.
 - Componentes compartidos: `frontend/src/components/`; comportamiento reutilizable: `frontend/src/composables/`.
 - HTTP, contratos y formatos: `frontend/src/services/`.
 - Pruebas unitarias Vue/TypeScript: archivos `*.test.ts` junto al código; navegador: `frontend/tests/e2e/`.
@@ -58,7 +58,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 
 ### Clientes y usuarios
 
-- La edición de clientes conserva nombre, apellido, correo, teléfono y CUIL/CUIT. No guardar una proyección incompleta sobre la entidad ni perder campos de contacto omitidos por un consumidor anterior.
+- La edición de clientes conserva nombre, apellido, correo, teléfono, CUIL/CUIT, DNI y los opcionales `legalName`, `tradeName` y `externalCode`. No guardar una proyección incompleta sobre la entidad ni perder campos omitidos por un consumidor anterior. En los campos comerciales, omitido/NULL conserva el valor y una cadena vacía lo limpia; las búsquedas por cliente incluyen razón social y nombre de fantasía.
 - La vinculación usuario–cliente debe actualizar ambos lados de la relación. Un cliente no puede quedar vinculado a dos cuentas desde el flujo web.
 - Editar la identidad o los permisos de un usuario conserva su hash de contraseña. El cambio de contraseña es una operación y pantalla independientes.
 - El usuario activo no puede deshabilitar su propia cuenta ni quitarse su rol ADMIN desde el flujo administrativo.
@@ -76,13 +76,17 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 
 ### Pagos y fechas
 
-- Un pago pertenece a una licencia y no cambia de licencia desde su edición. Un ID de edición inexistente debe producir 404, no un alta implícita ni una respuesta de éxito vacía.
-- El descuento no supera el importe; validar precisión y límites en servidor. El contrato web utiliza `BigDecimal`, pero el modelo persistente conserva `Double`: no afirmar que existe precisión decimal garantizada en la base ni cambiar columnas sin plan de migración.
-- Anular marca la fecha de baja y conserva el historial. Repetir la anulación preserva esa fecha; reactivar la limpia. Un pago anulado debe reactivarse antes de editarse.
-- Registrar o cobrar un pago no extiende automáticamente la vigencia de la licencia.
-- El contrato web transmite fechas de calendario como `YYYY-MM-DD`, sin conversión UTC que cambie el día. Reutilizar `services/format.ts` y `DateInput.vue`; en backend respetar la conversión entre `LocalDate` y el modelo existente con `Calendar`.
+- Payment pertenece obligatoriamente a Client y tiene License opcional del mismo cliente. El portal toma el cliente del principal restringido y valida cada relación en servidor.
+- Los importes persistidos de pagos y saldos usan BigDecimal y DECIMAL(14,2), en ARS. No reintroducir descuento ni fechas antiguas de cobro/vencimiento del pago.
+- Toda presentación comienza PENDIENTE y registra historial inicial, usuario asociado y origen. No permitir edición genérica, borrado ordinario, anulación/reactivación ni reapertura de decisiones terminales.
+- Conservar idempotencia por cliente/clave y la fotografía bancaria. Los reenvíos idénticos no duplican evidencia; una clave reutilizada con otros datos produce conflicto.
+- La revisión administrativa exige ADMIN del acceso autenticado. Solo PENDIENTE puede pasar una vez a APROBADO o RECHAZADO; el rechazo exige motivo público. Bloquear cliente y pago, comprobar versión y conservar historial. La aprobación y las acciones de licencia elegidas se confirman en una transacción READ_COMMITTED.
+- La vista previa de aprobación calcula fechas en portal.review.time-zone (por defecto America/Argentina/Buenos_Aires), sugiere el día 10 del próximo mes sin acortar un vencimiento posterior y exige confirmación explícita al acortar. Comprobar también la revisión de cada licencia y del día al confirmar. Quitar bloqueo forzado no implica vigencia si la fecha sigue vencida o falta. Conservar la conversión Calendar y las demás reglas existentes.
+- Presentar o aprobar un pago no extiende automáticamente la vigencia ni modifica ClientAccountBalance. El saldo es una fotografía externa, sin edición manual ni saldo cero inventado.
+- Fechas de calendario viajan como YYYY-MM-DD; emisión del pago como fecha/hora local ISO sin conversión UTC. Reutilizar services/format.ts y DateInput.vue; conservar Calendar en el modelo de licencias y la semántica de inicio de día.
 - La zona horaria del servidor afecta las reglas actuales. Verificar límites de día, vencimiento y nulabilidad al cambiar fechas.
-- El portal de estado de cuenta es una evolución pendiente. No asumir que existen facturas, ledger, saldo a favor o conciliación; tampoco mostrar datos ficticios como información real del cliente.
+- El portal permite consultar y abrir comprobantes de pagos propios y agregar nuevos, sin borrar ni reemplazar los anteriores. No expone comentarios privados, actores ni auditoría. No asumir facturas, ledger, conciliación ni sincronización que no existen.
+- Guardar comprobantes solo en ReceiptStorage privado, con contenido verificado y permisos. No usar nombres del navegador como rutas, ni servir el directorio como estático. Preservar coordinación de archivos con la transacción y reconciliación de residuos.
 
 ## Backend
 
@@ -107,7 +111,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 - El actor se resuelve desde el ID persistido del principal autenticado (sesión o JWT), mediante una referencia LAZY a `User`, sin consultas ni cascadas durante el flush. No aceptar usuarios o fechas de auditoría desde el JSON ni serializar los grafos de actores. En pruebas de escritura autenticada, usar el login real o un principal con ID persistido; un `@WithMockUser` genérico sin ID no representa al actor del sistema.
 - Sin autenticación, el usuario de auditoría queda NULL, sin inventar cuentas. Los datos históricos desconocidos permanecen NULL; no atribuirlos al operador que ejecuta una migración o una edición posterior.
 - Las modificaciones exclusivas de tablas de asociación pueden no disparar `PreUpdate` del propietario. Invocar `markModified()` cuando corresponda; `User.setAuthorities` ya contempla este caso.
-- UPDATE/DELETE masivos JPQL, SQL nativo y SQL externo eluden los listeners JPA. Evitarlos para operaciones de negocio o actualizar la auditoría explícitamente, con pruebas. La anulación no es un DELETE físico ni un historial completo de todas las versiones del registro.
+- UPDATE/DELETE masivos JPQL, SQL nativo y SQL externo eluden los listeners JPA. Evitarlos para operaciones de negocio o actualizar la auditoría explícitamente y verificar el resultado. La anulación no es un DELETE físico ni un historial completo de todas las versiones del registro.
 - Agregar el script MySQL correspondiente al introducir una entidad o modificar sus campos; las referencias de auditoría no deben tener cascada de persistencia/eliminación sobre el usuario.
 
 ### Scripts de cambios de base de datos
@@ -140,7 +144,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 - No debilitar CSP para incorporar scripts inline, `unsafe-eval`, CDNs o HTML arbitrario. PrimeVue requiere actualmente estilos dinámicos; no confundir esa excepción con permiso para ejecutar scripts inline.
 - Preservar los contratos externos existentes de `/auth`, `/refresh`, `/user` y `/api/...`, incluidos nombres JSON y parámetros utilizados por AngryBox. Leer controlador y consumidores antes de cambiarlos; no trasladar contratos del otro proyecto.
 - Las operaciones y problemas pendientes de los servicios antiguos siguen existiendo aunque el frontend nuevo no los use. No presentar una corrección web como una auditoría completa de JWT o de toda la API anterior.
-- El futuro portal de clientes requiere autorización por propietario en cada consulta. No habilitar las rutas administrativas para USER/SELLER como sustituto de ese módulo.
+- El portal de clientes requiere autorización por propietario en cada consulta, tomando el cliente del principal restringido. No heredar roles del usuario asociado ni promover ese principal durante la revalidación. Mantener una lista explícita de capacidades y rutas permitidas; no habilitar rutas administrativas para USER/SELLER.
 
 ## Frontend
 
@@ -159,7 +163,7 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 
 - Mantener historial hash, páginas lazy y resolución del contexto sin hostname fijo en producción.
 - La entrada por el puerto se resuelve en `PortEntryConfig`; la entrada SPA y los alias anteriores, en `FrontendController`. Una prueba MockMvc no verifica una ruta fuera del contexto servlet: usar HTTP real para ese caso.
-- La pantalla principal actual es `/licenses`. Sin sesión, redirigir al login; con sesión, abrir la principal o el destino interno solicitado.
+- La entrada anónima principal es `/access` (DNI/CUIT); `/login` conserva el acceso con contraseña. ADMIN autenticado con contraseña abre `/licenses`; las sesiones restringidas abren `/portal`. Solo restaurar destinos permitidos para el tipo de sesión.
 - Reutilizar `features/auth/navigation.ts` para conservar destino y filtros tras autenticación o vencimiento. Rechazar retornos externos, desconocidos o circulares al login.
 - Un login fallido conserva el destino pendiente. El logout voluntario no debe recuperar automáticamente una pantalla protegida.
 - La configuración de desarrollo utiliza `/clientmanager` y proxy Vite al backend en 3000. Si cambia ese contrato, revisar conjuntamente `vite.config.ts`, `services/http.ts`, documentación y pruebas.
@@ -178,10 +182,11 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 
 ## Pruebas y verificación
 
-- Elegir verificaciones proporcionales al cambio. Una corrección de lógica, permisos, persistencia o navegación necesita regresión significativa cuando sea viable; un cambio documental o visual simple no requiere pruebas unitarias que repliquen la implementación.
-- Usar JUnit 5 y MockMvc para contratos, validación, seguridad y persistencia observable; servidor real para redirecciones fuera del contexto. Mantener `@ActiveProfiles("test")` y H2 aislada.
-- Probar consultas y relaciones no triviales contra la base de pruebas; mocks no verifican Criteria, JPQL ni cascadas.
-- Usar Vitest y Vue Test Utils para estado y comportamiento; Playwright para recorridos completos, sesión, formularios y adaptación visual.
+- No se exige cobertura de código ni crear pruebas nuevas por defecto en cada cambio. No agregar tests solo para aumentar cobertura; incorporar pruebas nuevas cuando el usuario lo solicite.
+- Elegir verificaciones proporcionales al cambio mediante compilación, comprobación de tipos, pruebas existentes o comprobaciones manuales, según corresponda. Adaptar las pruebas existentes si cambia el contrato que verifican. Un cambio documental simple no requiere compilar ni ejecutar pruebas.
+- Cuando se trabaje con pruebas Java, usar JUnit 5 y MockMvc para contratos, validación, seguridad y persistencia observable; servidor real para redirecciones fuera del contexto. Mantener `@ActiveProfiles("test")` y H2 aislada.
+- Si se verifican consultas o relaciones mediante pruebas, usar la base de pruebas; mocks no verifican Criteria, JPQL ni cascadas.
+- Cuando se trabaje con pruebas de frontend, usar Vitest y Vue Test Utils para estado y comportamiento; Playwright para recorridos completos, sesión, formularios y adaptación visual.
 - Las pruebas Playwright crean y modifican datos: ejecutarlas solo contra una base aislada con cuentas de prueba. Los tres roles deben estar configurados si el recorrido crea usuarios.
 - No incorporar cuentas de bootstrap o H2 al artefacto de producción para facilitar las pruebas. No depender de scripts temporales de otro equipo que no estén versionados.
 - No desactivar pruebas ni debilitar assertions para obtener una suite verde. Informar qué no se verificó y por qué.

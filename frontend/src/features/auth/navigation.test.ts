@@ -7,10 +7,10 @@ afterEach(() => {
   session.user = null;
 });
 describe("Navegación de acceso", () => {
-  it("envía la entrada anónima al login y vuelve a la pantalla principal con sesión", async () => {
+  it("envía la entrada anónima al acceso por documento y vuelve a la pantalla principal con sesión", async () => {
     await router.push("/");
-    expect(router.currentRoute.value.path).toBe("/login");
-    session.user = { username: "admin", roles: ["ROLE_ADMIN"] };
+    expect(router.currentRoute.value.path).toBe("/access");
+    session.user = { username: "admin", roles: ["ROLE_ADMIN"], access: "ADMIN" };
     await router.replace(
       returnPath(router.currentRoute.value.query.redirect, router),
     );
@@ -23,7 +23,7 @@ describe("Navegación de acceso", () => {
     expect(router.currentRoute.value.query.redirect).toBe(
       "/payments?licenseId=7",
     );
-    session.user = { username: "admin", roles: ["ROLE_ADMIN"] };
+    session.user = { username: "admin", roles: ["ROLE_ADMIN"], access: "ADMIN" };
     await router.replace(
       returnPath(router.currentRoute.value.query.redirect, router),
     );

@@ -17,6 +17,11 @@ const client: Client = {
   phone: "123456",
   cuil: "20123456789",
   username: "ana",
+  dni: "12345678",
+  legalName: null,
+  tradeName: null,
+  externalCode: null,
+  portalUserMissing: false,
 };
 function editor() {
   return mount(ClientEditor, {
@@ -50,6 +55,10 @@ describe("Edición de clientes", () => {
         email: "ana@example.test",
         phone: "123456",
         cuil: "20123456789",
+        dni: "12345678",
+        legalName: "",
+        tradeName: "",
+        externalCode: "",
       },
       7,
     );

@@ -7,11 +7,16 @@ export interface Client {
   email: string;
   phone: string;
   cuil: string;
+  dni: string | null;
+  legalName: string | null;
+  tradeName: string | null;
+  externalCode: string | null;
+  portalUserMissing: boolean;
   username: string;
 }
 export type ClientInput = Pick<
   Client,
-  "firstname" | "lastname" | "email" | "phone" | "cuil"
+  "firstname" | "lastname" | "email" | "phone" | "cuil" | "dni" | "legalName" | "tradeName" | "externalCode"
 >;
 export interface ClientPage {
   content: Client[];
@@ -21,7 +26,7 @@ export interface ClientPage {
   size: number;
 }
 export function emptyClient(): ClientInput {
-  return { firstname: "", lastname: "", email: "", phone: "", cuil: "" };
+  return { firstname: "", lastname: "", email: "", phone: "", cuil: "", dni: "", legalName: "", tradeName: "", externalCode: "" };
 }
 export function clientDraft(client: Client): ClientInput {
   return {
@@ -30,6 +35,10 @@ export function clientDraft(client: Client): ClientInput {
     email: client.email ?? "",
     phone: client.phone ?? "",
     cuil: client.cuil ?? "",
+    dni: client.dni ?? "",
+    legalName: client.legalName ?? "",
+    tradeName: client.tradeName ?? "",
+    externalCode: client.externalCode ?? "",
   };
 }
 export const clientsApi = {

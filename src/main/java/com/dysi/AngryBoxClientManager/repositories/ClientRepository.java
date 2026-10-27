@@ -16,16 +16,28 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClientRepository extends JpaRepository<Client, Long> {
 
+    String NORMALIZED_CUIT = "replace(replace(replace(coalesce(c.cuil, ''), '-', ''), '.', ''), ' ', '')";
+    // REPLACE funciona también en servidores sin REGEXP_REPLACE. Un resto no vacío
+    // identifica datos históricos con letras u otros caracteres, que no deben autenticar.
+    String CUIT_WITHOUT_DIGITS = "replace(replace(replace(replace(replace("
+            + "replace(replace(replace(replace(replace(" + NORMALIZED_CUIT
+            + ", '0', ''), '1', ''), '2', ''), '3', ''), '4', ''),"
+            + " '5', ''), '6', ''), '7', ''), '8', ''), '9', '')";
+
     @Query(value = "select c from Client c left join fetch c.user u where "
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
             + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
             + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
+            + "or lower(coalesce(c.legalName, '')) like :keyword escape '!' "
+            + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
             + "or lower(coalesce(u.username, '')) like :keyword escape '!'",
             countQuery = "select count(c) from Client c left join c.user u where "
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
             + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
             + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
+            + "or lower(coalesce(c.legalName, '')) like :keyword escape '!' "
+            + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
             + "or lower(coalesce(u.username, '')) like :keyword escape '!'")
     org.springframework.data.domain.Page<Client> searchForWeb(@Param("keyword") String keyword,
@@ -33,8 +45,26 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 	
     public Client findClientByUser(User user);
 
+    // Serializa presentaciones de un cliente para resolver reenvíos sin duplicar evidencia.
+    @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Client c where c.id = :id and c.removeDate is null")
+    java.util.Optional<Client> lockPortalClient(@Param("id") Long id);
+
+    // Filtrar y limitar en BD; no cargar el padrón de documentos en memoria.
+    @Query("select c.id from Client c where c.removeDate is null and "
+            + "((:type = 'CUIT' and " + NORMALIZED_CUIT + " = :document) "
+            + "or (:type = 'DNI' and ((length(c.dni) > 0 and function('lpad', c.dni, 8, '0') = :dni) "
+            + "or (length(" + NORMALIZED_CUIT + ") = 11 and length(" + CUIT_WITHOUT_DIGITS + ") = 0 "
+            + "and substring(" + NORMALIZED_CUIT + ", 3, 8) = :dni))))")
+    List<Long> findPortalDocumentMatches(@Param("type") String type, @Param("document") String document,
+            @Param("dni") String dni, org.springframework.data.domain.Pageable pageable);
+
+    @Query("select c.id from Client c where c.user.id = :userId and c.removeDate is null")
+    List<Long> findPortalClientsForUser(@Param("userId") Long userId,
+            org.springframework.data.domain.Pageable pageable);
+
     @Query("select new com.dysi.AngryBoxClientManager.dtos.ClientDTO("
-    		+ " c.id, c.firstname, c.lastname, c.email, c.phone, c.cuil, u.username)"
+            + " c.id, c.firstname, c.lastname, c.email, c.phone, c.cuil, u.username, c.legalName, c.tradeName, c.externalCode)"
     		+ " from Client c "
     		+ " left join c.user u "
     		+ " order by c.firstname asc, c.lastname asc")
@@ -73,6 +103,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     		+ "    or (lower(l.companyName) like lower(:keyword)) "
     		+ "    or (lower(concat(c.firstname,' ', c.lastname)) like lower(:keyword))"
     		+ "    or (lower(concat(c.lastname,' ', c.firstname)) like lower(:keyword))"
+            + "    or (lower(c.legalName) like lower(:keyword))"
+            + "    or (lower(c.tradeName) like lower(:keyword))"
     		+ " )"
     		+ " and (:statusId is null or :statusId = -1 "
     		+ "    or (:statusId = 1 and s.forcedLock = false and s.lockDate > :dateNow)"

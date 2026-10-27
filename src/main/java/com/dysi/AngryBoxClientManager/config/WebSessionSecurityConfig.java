@@ -1,5 +1,8 @@
 package com.dysi.AngryBoxClientManager.config;
 
+import com.dysi.AngryBoxClientManager.servicesImpl.PortalAccessService;
+import com.dysi.AngryBoxClientManager.security.WebSessionUserFilter;
+
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -15,8 +18,11 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @Order(1)
 public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
     private final org.springframework.security.core.userdetails.UserDetailsService users;
-    public WebSessionSecurityConfig(org.springframework.security.core.userdetails.UserDetailsService users) {
+    private final PortalAccessService portal;
+    public WebSessionSecurityConfig(org.springframework.security.core.userdetails.UserDetailsService users,
+            PortalAccessService portal) {
         this.users = users;
+        this.portal = portal;
     }
 
     @Override
@@ -31,10 +37,18 @@ public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
         http.requestMatcher(browser)
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED).and()
                 .authorizeRequests()
-                .antMatchers(HttpMethod.GET, "/", "/ui", "/ui/**", "/users/login", "/web/session/csrf").permitAll()
-                .antMatchers(HttpMethod.POST, "/web/session/login").permitAll()
+                .antMatchers(HttpMethod.GET, "/", "/ui", "/ui/**", "/users/login", "/web/session/csrf", "/web/session/support").permitAll()
+                .antMatchers(HttpMethod.POST, "/web/session/login", "/web/session/document").permitAll()
+                .antMatchers(HttpMethod.GET, "/web/session").authenticated()
+                .antMatchers(HttpMethod.GET, "/web/portal/context", "/web/portal/overview", "/web/portal/licenses",
+                        "/web/portal/accounts", "/web/portal/payment-form", "/web/portal/payments",
+                        "/web/portal/payments/*/comments", "/web/portal/payments/*", "/web/portal/payments/*/attachments",
+                        "/web/portal/payments/*/attachments/*").hasAuthority("PORTAL_VIEW")
+                .antMatchers(HttpMethod.POST, "/web/portal/payments", "/web/portal/payments/*/attachments").hasAuthority("PORTAL_SUBMIT")
+                .antMatchers(HttpMethod.POST, "/web/portal/payments/*/comments").hasAuthority("PORTAL_COMMENT")
+                .antMatchers("/web/portal/**").denyAll()
                 .antMatchers("/web/api/**", "/index/**", "/users/create/**", "/users/edit/**").hasRole("ADMIN")
-                .anyRequest().authenticated().and()
+                .anyRequest().hasRole("ADMIN").and()
                 .exceptionHandling()
                 .authenticationEntryPoint((request, response, error) -> {
                     String path = request.getRequestURI().substring(request.getContextPath().length());
@@ -62,7 +76,7 @@ public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
                     }
                 });
         // Default session-backed CSRF repository is deliberately enabled.
-        http.addFilterAfter(new com.dysi.AngryBoxClientManager.security.WebSessionUserFilter(users),
+        http.addFilterAfter(new WebSessionUserFilter(users, portal),
                 org.springframework.security.web.context.SecurityContextPersistenceFilter.class);
         http.headers().addHeaderWriter((request, response) -> {
             if (request.getRequestURI().substring(request.getContextPath().length()).startsWith("/ui")) {

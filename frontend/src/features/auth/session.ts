@@ -4,6 +4,8 @@ import { ApiError, refreshCsrf, request } from "../../services/http";
 export interface SessionUser {
   username: string;
   roles: string[];
+  access: "ADMIN" | "PORTAL";
+  origin?: "PORTAL_DOCUMENTO" | "ACCESO_AUTENTICADO";
 }
 export const session = reactive<{ user: SessionUser | null; ready: boolean }>({
   user: null,
@@ -26,6 +28,15 @@ export async function signIn(username: string, password: string) {
   session.user = await request<SessionUser>("/web/session/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
+  });
+  await refreshCsrf();
+}
+
+export async function signInDocument(type: "DNI" | "CUIT", document: string) {
+  await refreshCsrf();
+  session.user = await request<SessionUser>("/web/session/document", {
+    method: "POST",
+    body: JSON.stringify({ type, document }),
   });
   await refreshCsrf();
 }

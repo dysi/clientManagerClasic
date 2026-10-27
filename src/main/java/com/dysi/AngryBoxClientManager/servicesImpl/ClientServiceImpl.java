@@ -39,6 +39,8 @@ public class ClientServiceImpl implements ClientService {
 				ClientDTO cDTO = new ClientDTO(c.getId(), c.getFirstname(), c.getLastname(), c.getEmail(), c.getPhone(),
 						c.getCuil(), (c.getUser() != null ? c.getUser().getUsername() : "SIN ASIGNAR"));
 				clientsDTO.add(cDTO);
+                cDTO.setLegalName(c.getLegalName()); cDTO.setTradeName(c.getTradeName());
+                cDTO.setExternalCode(c.getExternalCode());
 			}
 		}
 
@@ -90,6 +92,9 @@ public class ClientServiceImpl implements ClientService {
 		if (clientEdit.getCuil() != null) cliente.setCuil(clientEdit.getCuil().trim());
 		if (clientEdit.getPhone() != null) cliente.setPhone(clientEdit.getPhone().trim());
 		if (clientEdit.getEmail() != null) cliente.setEmail(clientEdit.getEmail().trim());
+        if (clientEdit.getLegalName() != null) cliente.setLegalName(clientEdit.getLegalName());
+        if (clientEdit.getTradeName() != null) cliente.setTradeName(clientEdit.getTradeName());
+        if (clientEdit.getExternalCode() != null) cliente.setExternalCode(clientEdit.getExternalCode());
 
 		cliente = this.clientRepository.saveAndFlush(cliente);
 

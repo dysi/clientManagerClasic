@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Card from "primevue/card";
 import InputText from "primevue/inputtext";
@@ -7,14 +7,20 @@ import Password from "primevue/password";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
+import SelectButton from "primevue/selectbutton";
 import FormField from "../../components/FormField.vue";
-import { signIn } from "./session";
+import { signIn, signInDocument } from "./session";
 import { returnPath } from "./navigation";
 const username = ref("");
 const password = ref("");
 const busy = ref(false);
 const error = ref("");
 const help = ref(false);
+const props = withDefaults(defineProps<{ documentMode?: boolean }>(), { documentMode: false });
+const documentType = ref<"DNI" | "CUIT">("DNI");
+const document = ref("");
+const documentTypes = ["DNI", "CUIT"];
+watch(documentType, () => { document.value = ""; error.value = ""; });
 const router = useRouter();
 const route = useRoute();
 async function submit() {
@@ -22,7 +28,8 @@ async function submit() {
   busy.value = true;
   error.value = "";
   try {
-    await signIn(username.value.trim(), password.value);
+    if (props.documentMode) await signInDocument(documentType.value, document.value);
+    else await signIn(username.value.trim(), password.value);
     password.value = "";
     await router.replace(returnPath(route.query.redirect, router));
   } catch (failure) {
@@ -110,6 +117,11 @@ async function submit() {
       aria-labelledby="welcome-title"
     >
       <div class="w-full max-w-md">
+        <div class="mb-6 flex justify-end">
+          <Button as="router-link" :to="documentMode ? '/login' : '/access'"
+            :label="documentMode ? 'Ingreso para usuarios' : 'Ingreso con DNI / CUIT'" text
+            icon="pi pi-sign-in" />
+        </div>
         <div class="mb-8">
           <p class="mb-3 text-xs font-semibold tracking-widest text-primary">
             TU PORTAL DYSI
@@ -121,7 +133,7 @@ async function submit() {
             Te damos la bienvenida
           </h1>
           <p class="mt-3 leading-relaxed text-muted-color">
-            Nos alegra verte por acá. Ingresá con tus datos para continuar.
+            {{ documentMode ? 'Ingresá tu DNI o CUIT registrado para acceder al portal.' : 'Ingresá con tu usuario y contraseña para continuar.' }}
           </p>
         </div>
         <Card class="border border-surface shadow-sm">
@@ -134,6 +146,22 @@ async function submit() {
               <Message v-if="error" severity="error" role="alert">{{
                 error
               }}</Message>
+              <template v-if="documentMode">
+                <div class="flex flex-col gap-2">
+                  <span id="document-type-label" class="font-medium">Tipo de documento</span>
+                  <SelectButton v-model="documentType" :options="documentTypes" :allow-empty="false"
+                    :disabled="busy" aria-labelledby="document-type-label" />
+                </div>
+                <FormField id="document" :label="documentType" required v-slot="field"
+                  :hint="documentType === 'DNI' ? 'Hasta ocho dígitos; podés usar puntos.' : 'Once dígitos; podés usar guiones.'">
+                  <InputText id="document" v-model="document" inputmode="numeric" autocomplete="off"
+                    :placeholder="documentType === 'DNI' ? '12.345.678' : '20-12345678-9'"
+                    :pattern="documentType === 'DNI' ? '[0-9 .\\-]{1,14}' : '[0-9 .\\-]{11,18}'"
+                    :maxlength="documentType === 'DNI' ? 14 : 18" required :disabled="busy"
+                    :aria-describedby="field.describedby" fluid />
+                </FormField>
+              </template>
+              <template v-else>
               <FormField
                 id="username"
                 label="Usuario"
@@ -166,9 +194,10 @@ async function submit() {
                   fluid
                 />
               </FormField>
+              </template>
               <Button
                 type="submit"
-                label="Iniciar sesión"
+                :label="documentMode ? 'Ingresar al portal' : 'Iniciar sesión'"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
                 :loading="busy"
@@ -182,8 +211,7 @@ async function submit() {
                   aria-hidden="true"
                 />
                 <p>
-                  Tu acceso es personal. No compartas tu contraseña ni tus datos
-                  de ingreso.
+                  {{ documentMode ? 'El ingreso por documento permite un acceso limitado y no verifica tu identidad.' : 'Tu acceso es personal. No compartas tu contraseña ni tus datos de ingreso.' }}
                 </p>
               </div>
             </form>
@@ -203,8 +231,7 @@ async function submit() {
             id="login-help"
             severity="info"
             class="mt-3 text-left"
-            >Si olvidaste tu contraseña o todavía no tenés usuario, contactá a
-            tu referente de DySI para recuperar el acceso.</Message
+            >{{ documentMode ? 'Si tu documento no está registrado o no podés ingresar, contactá a un administrador para revisar tus datos y el usuario vinculado.' : 'Si olvidaste tu contraseña o todavía no tenés usuario, contactá a tu referente de DySI para recuperar el acceso.' }}</Message
           >
         </div>
         <Divider class="my-6" />

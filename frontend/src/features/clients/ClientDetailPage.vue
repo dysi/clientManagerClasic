@@ -34,11 +34,22 @@ onMounted(async () => {
         label="Editar datos"
         icon="pi pi-pencil"
     /></PageHeader>
+    <Message v-if="client.portalUserMissing" severity="warn" :closable="false" class="mb-5">
+      Este cliente no tiene un usuario vinculado y no puede ingresar al portal. Vinculá una cuenta habilitada desde Usuarios.
+    </Message>
     <div class="grid gap-6 lg:grid-cols-3">
       <Card class="lg:col-span-2"
         ><template #title>Contacto e identificación</template
         ><template #content
           ><dl class="grid gap-6 py-2 sm:grid-cols-2">
+            <div><dt class="text-sm text-muted-color">Razón social</dt>
+              <dd class="mt-2 break-words">{{ client.legalName || "Sin registrar" }}</dd></div>
+            <div><dt class="text-sm text-muted-color">Nombre de fantasía</dt>
+              <dd class="mt-2 break-words">{{ client.tradeName || "Sin registrar" }}</dd></div>
+            <div><dt class="text-sm text-muted-color">Código externo</dt>
+              <dd class="mt-2 break-all">{{ client.externalCode || "Sin registrar" }}</dd></div>
+            <div><dt class="text-sm text-muted-color">DNI</dt>
+              <dd class="mt-2">{{ client.dni || "Sin DNI registrado" }}</dd></div>
             <div>
               <dt class="text-sm text-muted-color">Correo electrónico</dt>
               <dd class="mt-2 break-all">

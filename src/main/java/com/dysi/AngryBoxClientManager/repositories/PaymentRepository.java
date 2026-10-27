@@ -14,16 +14,19 @@ import com.dysi.AngryBoxClientManager.models.Payment;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Payment> {
 
+    java.util.Optional<Payment> findByClientIdAndSubmissionKey(Long clientId, String submissionKey);
+    java.util.Optional<Payment> findByIdAndClientIdAndRemoveDateIsNull(Long id, Long clientId);
+
 	@Query("select p from Payment p inner join p.license l"
 			+ " where l.id = :licenseId"
-			+ " order by p.paymentDate desc")
+			+ " order by p.issuedAt desc")
 	Page<Payment> findPaymentsPaginatedByLicense(@Param("licenseId") Long licenseId, Pageable pageable);
 
 	@Query("select p "
 			+ " from Payment p"
 			+ " inner join p.license l"
 			+ " where l.id = :licenseId"
-			+ " order by p.paymentDate desc")
+			+ " order by p.issuedAt desc")
 	List<Payment> findPaymentsPaginatedByLicense(
 			@Param("licenseId") long licenseId);
 }

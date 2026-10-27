@@ -32,6 +32,7 @@ class WebFrontendTests {
     @Autowired ClientRepository clients;
     @Autowired PasswordEncoder passwords;
     @Autowired PaymentRepository payments;
+    @Autowired javax.persistence.EntityManager em;
 
     private JsonNode write(Browser browser, String method, String path, Object body, int expected) throws Exception {
         return json.readTree(mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method), path)
@@ -113,30 +114,33 @@ class WebFrontendTests {
         assertEquals("2099-12-31", write(browser, "PUT", "/web/api/licenses/" + id, input, 200).get("lockDate").asText());
     }
 
-    @Test void paymentsPreserveDatesRejectInvalidAmountsAndKeepRemovalIdempotent() throws Exception {
+    @Test void obsoletePaymentWritesAreClosedAndUnknownIdsRemainNotFound() throws Exception {
         account(AuthorityName.ROLE_ADMIN); Browser browser = login();
-        long license = write(browser, "POST", "/web/api/licenses", licenseInput(newClient(browser, "Ana"), 111L), 201).get("id").asLong();
-        var input = new java.util.HashMap<String, Object>(java.util.Map.of("licenseId", license, "amount", 100.25,
-                "discount", 10.10, "paymentDate", "2026-10-01", "expirationDate", "2026-10-31", "observation", "Prueba"));
-        JsonNode created = write(browser, "POST", "/web/api/payments", input, 201);
-        long id = created.get("id").asLong();
-        assertEquals("2026-10-01", created.get("paymentDate").asText());
-        assertEquals("2026-10-31", created.get("expirationDate").asText());
-        assertTrue(created.get("paymentRealDate").isNull());
-        input.put("discount", 200); write(browser, "PUT", "/web/api/payments/" + id, input, 400);
-        input.put("discount", 10.10); input.put("paymentRealDate", "2026-10-24");
-        assertEquals("2026-10-24", write(browser, "PUT", "/web/api/payments/" + id, input, 200).get("paymentRealDate").asText());
-        write(browser, "PUT", "/web/api/payments/999999", input, 404);
-        write(browser, "PUT", "/web/api/payments/" + id + "/status", java.util.Map.of("removed", true), 200);
-        var removedAt = payments.findById(id).orElseThrow().getRemoveDate().getTimeInMillis();
-        write(browser, "PUT", "/web/api/payments/" + id + "/status", java.util.Map.of("removed", true), 200);
-        assertEquals(removedAt, payments.findById(id).orElseThrow().getRemoveDate().getTimeInMillis());
-        write(browser, "PUT", "/web/api/payments/" + id, input, 409);
-        mvc.perform(get("/web/api/payments").session(browser.session).param("status", "REMOVED"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
-        assertFalse(write(browser, "PUT", "/web/api/payments/" + id + "/status", java.util.Map.of("removed", false), 200).get("removed").asBoolean());
-        mvc.perform(get("/web/api/payments").session(browser.session).param("status", "PAID"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+        write(browser, "POST", "/web/api/payments", java.util.Map.of(), 409);
+        write(browser, "PUT", "/web/api/payments/999999", java.util.Map.of(), 404);
+        write(browser, "PUT", "/web/api/payments/999999/status", java.util.Map.of("removed", true), 404);
+        assertEquals(0, payments.count());
+    }
+
+    @Test void paymentListIncludesClientPaymentsWithoutLicenseAndHasNoLegacyOrPrivateFields() throws Exception {
+        User actor = account(AuthorityName.ROLE_ADMIN); Browser browser = login();
+        Client client = new Client(); client.setFirstname("Cliente"); client.setLastname("Sin licencia");
+        clients.saveAndFlush(client);
+        Payment payment = com.dysi.AngryBoxClientManager.payments.PaymentFixtures.payment(em, client, null, actor);
+        em.persist(payment); em.flush();
+        mvc.perform(get("/web/api/payments").session(browser.session).param("keyword", "Sin licencia").param("status", "PENDIENTE"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].licenseId").isEmpty())
+                .andExpect(jsonPath("$.content[0].amount").value(100.25))
+                .andExpect(jsonPath("$.content[0].discount").doesNotExist())
+                .andExpect(jsonPath("$.content[0].paymentRealDate").doesNotExist())
+                .andExpect(jsonPath("$.content[0].bankAccount").doesNotExist())
+                .andExpect(jsonPath("$.content[0].submittedBy").doesNotExist());
+        mvc.perform(get("/web/api/payments").session(browser.session).param("status", "APROBADO"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        write(browser, "PUT", "/web/api/payments/" + payment.getId(), java.util.Map.of(), 409);
+        write(browser, "PUT", "/web/api/payments/" + payment.getId() + "/status", java.util.Map.of("removed", true), 409);
+        assertEquals(PaymentStatus.PENDIENTE, payments.findById(payment.getId()).orElseThrow().getStatus());
     }
 
     @Test void userProfilePreservesPasswordAndMaintainsBothSidesOfClientLink() throws Exception {
@@ -234,9 +238,46 @@ class WebFrontendTests {
 
     @Test void userRoleCannotAdministerAndDisabledAccountLosesSession() throws Exception {
         User user = account(AuthorityName.ROLE_USER);
+        Client client = new Client(); client.setFirstname("Portal"); client.setLastname("Prueba");
+        client.setDni("1234567"); client.setCuil("20-01234567-9"); client.setUser(user);
+        clients.saveAndFlush(client); user.setClient(client); users.saveAndFlush(user);
         Browser browser = login();
+        mvc.perform(get("/web/session").session(browser.session)).andExpect(jsonPath("$.access").value("PORTAL"));
+        mvc.perform(get("/web/portal/context").session(browser.session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Portal"))
+                .andExpect(jsonPath("$.origin").value("ACCESO_AUTENTICADO"));
         mvc.perform(get("/web/api/clients").session(browser.session)).andExpect(status().isForbidden());
         mvc.perform(get("/users/create").session(browser.session)).andExpect(status().isForbidden());
+        // Incluso un usuario ADMIN asociado solo recibe la capacidad del portal por documento.
+        Authority admin = new Authority(); admin.setName(AuthorityName.ROLE_ADMIN); authorities.saveAndFlush(admin);
+        user.setAuthorities(new java.util.ArrayList<>(List.of(admin))); users.saveAndFlush(user);
+        mvc.perform(post("/web/session/document").session(browser.session).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"DNI\",\"document\":\"1.234.567\"}")).andExpect(status().isForbidden());
+        mvc.perform(post("/web/session/document").session(browser.session).header(browser.header, browser.token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"CUIT\",\"document\":\"20-01234567-9\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.roles[0]").value("PORTAL_VIEW"))
+                .andExpect(jsonPath("$.origin").value("PORTAL_DOCUMENTO"));
+        mvc.perform(get("/web/api/banks").session(browser.session)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/clients/getClientsLookups").session(browser.session)).andExpect(status().isForbidden());
+        mvc.perform(get("/web/portal/clients/999999").session(browser.session)).andExpect(status().isForbidden());
+        mvc.perform(get("/web/portal/context").session(browser.session).param("clientId", "999999"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Portal"))
+                .andExpect(jsonPath("$.cuil").doesNotExist()).andExpect(jsonPath("$.username").doesNotExist());
+        // La coincidencia desde los dígitos centrales funciona también sin DNI explícito.
+        client.setDni(null); clients.saveAndFlush(client);
+        JsonNode token = json.readTree(mvc.perform(get("/web/session/csrf").session(browser.session))
+                .andReturn().getResponse().getContentAsString());
+        mvc.perform(post("/web/session/document").session(browser.session)
+                .header(token.get("headerName").asText(), token.get("token").asText())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"DNI\",\"document\":\"1234567\"}"))
+                .andExpect(status().isOk());
+        Client ambiguous = new Client(); ambiguous.setDni("01234567"); clients.saveAndFlush(ambiguous);
+        token = json.readTree(mvc.perform(get("/web/session/csrf").session(browser.session))
+                .andReturn().getResponse().getContentAsString());
+        mvc.perform(post("/web/session/document").session(browser.session)
+                .header(token.get("headerName").asText(), token.get("token").asText())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"DNI\",\"document\":\"1234567\"}"))
+                .andExpect(status().isUnauthorized());
         user.setEnabled(false); users.saveAndFlush(user);
         mvc.perform(get("/web/session").session(browser.session)).andExpect(status().isUnauthorized());
     }

@@ -53,7 +53,9 @@ class EntityAuditTests {
         License license = new License(); license.setCompanyId(700L); license.setCompanyName("Audit license");
         license.setClient(client);
         LicenseStatus state = new LicenseStatus(); state.setLicense(license); state.setLockDate(Calendar.getInstance());
-        Payment payment = new Payment(); payment.setLicense(license); payment.setAmount(100d);
+        em.persist(license);
+        Payment payment = com.dysi.AngryBoxClientManager.payments.PaymentFixtures.payment(em, client, license, creator);
+        em.persist(payment);
         license.setLicenseStatuses(new ArrayList<>(List.of(state)));
         license.setPaymentList(new ArrayList<>(List.of(payment)));
         em.persist(license);
@@ -70,7 +72,7 @@ class EntityAuditTests {
         if (record instanceof Client) ((Client) record).setPhone(value);
         else if (record instanceof License) ((License) record).setDescription(value);
         else if (record instanceof LicenseStatus) ((LicenseStatus) record).setObservation(value);
-        else if (record instanceof Payment) ((Payment) record).setObservation(value);
+        else if (record instanceof Payment) ((Payment) record).setContactPhone(value);
         else if (record instanceof User) ((User) record).setFirstname(value);
     }
 
@@ -133,14 +135,14 @@ class EntityAuditTests {
         em.createNativeQuery("UPDATE payment SET creationdate=:created, removedate=:removed, created_by_id=NULL, removed_by_id=NULL WHERE id=:id")
                 .setParameter("created", created).setParameter("removed", removed).setParameter("id", payment.getId()).executeUpdate();
         em.clear(); as(editor);
-        Payment historical = em.find(Payment.class, payment.getId()); historical.setObservation("Historical update"); em.flush(); em.clear();
+        Payment historical = em.find(Payment.class, payment.getId()); historical.setContactPhone("Historical update"); em.flush(); em.clear();
         historical = em.find(Payment.class, payment.getId());
         assertEquals(created.getTime(), historical.getCreationDate().getTimeInMillis());
         assertEquals(removed.getTime(), historical.getRemoveDate().getTimeInMillis());
         assertNull(historical.getCreatedBy()); assertNull(historical.getRemovedBy());
         assertEquals(editor.getId(), historical.getModifiedBy().getId());
         em.createNativeQuery("UPDATE payment SET creationdate=NULL WHERE id=:id").setParameter("id", payment.getId()).executeUpdate();
-        em.clear(); historical = em.find(Payment.class, payment.getId()); historical.setObservation("Unknown creation date"); em.flush(); em.clear();
+        em.clear(); historical = em.find(Payment.class, payment.getId()); historical.setContactPhone("Unknown creation date"); em.flush(); em.clear();
         assertNull(em.find(Payment.class, payment.getId()).getCreationDate());
     }
 

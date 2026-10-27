@@ -23,12 +23,15 @@ public final class AdminViews {
         public boolean prePayment, locked;
     }
 
+    public static class PaymentCounts {
+        public long total, pending, approved, rejected;
+    }
+
     public static class PaymentView {
-        public Long id, licenseId;
-        public String companyName, observation;
-        public BigDecimal amount, discount;
-        public LocalDate paymentDate, expirationDate, paymentRealDate;
-        public boolean removed;
+        public Long id, clientId, licenseId;
+        public String clientName, companyName, currency, status;
+        public BigDecimal amount;
+        public java.time.LocalDateTime issuedAt;
     }
 
     public static class UserView {

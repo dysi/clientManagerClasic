@@ -10,13 +10,13 @@ export interface Option {
 const props = defineProps<{
   modelValue: number | null;
   label?: string;
-  kind: "clients" | "licenses";
+  kind: "clients" | "licenses" | "banks" | "portal-licenses";
   inputId: string;
   disabled?: boolean;
   invalid?: boolean;
   describedby?: string;
 }>();
-const emit = defineEmits<{ "update:modelValue": [id: number | null] }>();
+const emit = defineEmits<{ "update:modelValue": [id: number | null]; selected: [option: Option | null] }>();
 const selected = ref<Option | string | null>(null);
 const suggestions = ref<Option[]>([]);
 const error = ref("");
@@ -42,9 +42,11 @@ async function search(event: { query: string }) {
   const current = ++sequence;
   error.value = "";
   try {
-    const result = await request<Option[]>(
-      `/web/api/options/${props.kind}?${new URLSearchParams({ keyword: event.query })}`,
-    );
+    const params = new URLSearchParams({ keyword: event.query, size: "25" });
+    const result = props.kind === "portal-licenses"
+      ? (await request<{ content: { id: number; companyName: string }[] }>(`/web/portal/licenses?${params}`))
+          .content.map((license) => ({ id: license.id, label: license.companyName }))
+      : await request<Option[]>(`/web/api/options/${props.kind}?${params}`);
     if (current === sequence) suggestions.value = result;
   } catch {
     if (current === sequence)
@@ -53,6 +55,7 @@ async function search(event: { query: string }) {
 }
 function update(value: Option | string | null) {
   selected.value = value;
+    emit("selected", typeof value === "object" && value ? value : null);
   emit(
     "update:modelValue",
     typeof value === "object" && value ? value.id : null,
@@ -69,7 +72,7 @@ function update(value: Option | string | null) {
     :pt="{
       dropdown: {
         'aria-label':
-          kind === 'clients' ? 'Mostrar clientes' : 'Mostrar licencias',
+          { clients: 'Mostrar clientes', licenses: 'Mostrar licencias', banks: 'Mostrar bancos', 'portal-licenses': 'Mostrar mis licencias' }[kind],
       },
     }"
     force-selection

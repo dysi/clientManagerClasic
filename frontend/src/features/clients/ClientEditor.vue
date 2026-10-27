@@ -32,6 +32,25 @@ defineExpose({ changed: dirty, saving });
           error
         }}</Message>
         <div class="grid gap-5 md:grid-cols-2">
+          <FormField id="legalName" label="Razón social" :error="fields.legalName" v-slot="field">
+            <InputText id="legalName" v-model="form.legalName" maxlength="255" :disabled="saving"
+              :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
+          </FormField>
+          <FormField id="tradeName" label="Nombre de fantasía" :error="fields.tradeName" v-slot="field"
+            hint="Nombre por el que se conoce al comercio, para facilitar las búsquedas.">
+            <InputText id="tradeName" v-model="form.tradeName" maxlength="255" :disabled="saving"
+              :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
+          </FormField>
+          <FormField id="externalCode" label="Código externo" :error="fields.externalCode" v-slot="field"
+            hint="Identificador opcional para vincular este cliente con sistemas remotos.">
+            <InputText id="externalCode" v-model="form.externalCode" maxlength="100" :disabled="saving"
+              :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
+          </FormField>
+          <FormField id="dni" label="DNI" :error="fields.dni" v-slot="field"
+            hint="Hasta ocho dígitos, sin puntos ni guiones. Conservá los ceros iniciales si están registrados.">
+            <InputText id="dni" v-model="form.dni" inputmode="numeric" maxlength="8" pattern="[0-9]{0,8}"
+              :disabled="saving" :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
+          </FormField>
           <FormField
             id="firstname"
             label="Nombre"

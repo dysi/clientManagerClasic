@@ -2,7 +2,7 @@ package com.dysi.AngryBoxClientManager.dtos;
 
 import org.springframework.data.domain.Page;
 
-import com.dysi.AngryBoxClientManager.models.Payment;
+import com.dysi.AngryBoxClientManager.dtos.AdminViews.PaymentView;
 
 public class LicensePaymentsPaginationDTO {
 	
@@ -11,7 +11,7 @@ public class LicensePaymentsPaginationDTO {
 	private String companyName;
 	private Long companyId;
 
-	Page<Payment> payments;
+	Page<PaymentView> payments;
 
 	public Long getLicenseId() {
 		return licenseId;
@@ -45,11 +45,11 @@ public class LicensePaymentsPaginationDTO {
 		this.companyId = companyId;
 	}
 
-	public Page<Payment> getPayments() {
+	public Page<PaymentView> getPayments() {
 		return payments;
 	}
 
-	public void setPayments(Page<Payment> payments) {
+	public void setPayments(Page<PaymentView> payments) {
 		this.payments = payments;
 	}
 
