@@ -32,6 +32,7 @@ public class ReceiptAccessService {
 
     @PreAuthorize("hasAuthority('PORTAL_VIEW')")
     public Content openOwn(com.dysi.AngryBoxClientManager.security.PortalPrincipal principal, Long paymentId, Long attachmentId) {
+        access.requireSensitiveAccess(principal);
         Long client = access.revalidate(principal).getClientId();
         List<Attachment> files = em.createQuery("select a from PaymentAttachment pa join pa.attachment a "
                 + "where pa.payment.id = :payment and pa.payment.client.id = :client and a.id = :attachment "

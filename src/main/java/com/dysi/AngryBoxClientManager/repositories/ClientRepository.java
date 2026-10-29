@@ -15,6 +15,10 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ClientRepository extends JpaRepository<Client, Long> {
+    @Query("select new com.dysi.AngryBoxClientManager.dtos.ClientSyncIdentity("
+            + "c.id, c.firstname, c.lastname, c.legalName, c.tradeName, c.email, c.phone, "
+            + "c.dni, c.cuil, c.externalCode, c.removeDate) from Client c order by c.id")
+    List<com.dysi.AngryBoxClientManager.dtos.ClientSyncIdentity> findSyncIdentities();
 
     String NORMALIZED_CUIT = "replace(replace(replace(coalesce(c.cuil, ''), '-', ''), '.', ''), ' ', '')";
     // REPLACE funciona también en servidores sin REGEXP_REPLACE. Un resto no vacío
@@ -24,25 +28,42 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + ", '0', ''), '1', ''), '2', ''), '3', ''), '4', ''),"
             + " '5', ''), '6', ''), '7', ''), '8', ''), '9', '')";
 
-    @Query(value = "select c from Client c left join fetch c.user u where "
+    @Query(value = "select c from Client c left join fetch c.user u left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
             + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
             + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.legalName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
-            + "or lower(coalesce(u.username, '')) like :keyword escape '!'",
-            countQuery = "select count(c) from Client c left join c.user u where "
+            + "or lower(coalesce(u.username, '')) like :keyword escape '!')"
+            + " and (:balanceState = 'ALL' or (:balanceState = 'UNKNOWN' and b.id is null)"
+            + " or (:balanceState = 'DEBT' and b.amount > 0)"
+            + " or (:balanceState = 'CREDIT' and b.amount < 0)"
+            + " or (:balanceState = 'ZERO' and b.amount = 0))"
+            + " and (:staleBefore is null or b.synchronizedAt < :staleBefore)",
+            countQuery = "select count(c) from Client c left join c.user u left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
             + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
             + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.legalName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
-            + "or lower(coalesce(u.username, '')) like :keyword escape '!'")
+            + "or lower(coalesce(u.username, '')) like :keyword escape '!')"
+            + " and (:balanceState = 'ALL' or (:balanceState = 'UNKNOWN' and b.id is null)"
+            + " or (:balanceState = 'DEBT' and b.amount > 0)"
+            + " or (:balanceState = 'CREDIT' and b.amount < 0)"
+            + " or (:balanceState = 'ZERO' and b.amount = 0))"
+            + " and (:staleBefore is null or b.synchronizedAt < :staleBefore)")
     org.springframework.data.domain.Page<Client> searchForWeb(@Param("keyword") String keyword,
+            @Param("balanceState") String balanceState,
+            @Param("staleBefore") java.time.LocalDateTime staleBefore,
             org.springframework.data.domain.Pageable pageable);
 	
+    default org.springframework.data.domain.Page<Client> searchForWeb(String keyword,
+            org.springframework.data.domain.Pageable pageable) {
+        return searchForWeb(keyword, "ALL", null, pageable);
+    }
+
     public Client findClientByUser(User user);
 
     // Serializa presentaciones de un cliente para resolver reenvíos sin duplicar evidencia.

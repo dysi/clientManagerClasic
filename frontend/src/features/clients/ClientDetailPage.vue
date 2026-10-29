@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { money, displayDateTime } from "../../services/format";
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import Button from "primevue/button";
@@ -107,6 +108,27 @@ onMounted(async () => {
               text
             /></div></template
       ></Card>
+      <Card class="lg:col-span-3">
+        <template #title>Deuda y saldo del cliente</template>
+        <template #content>
+          <dl v-if="client.accountBalance" class="grid gap-6 py-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div><dt class="text-sm text-muted-color">Importe</dt>
+              <dd class="mt-2 font-semibold">{{ money(client.accountBalance.amount) }}</dd></div>
+            <div><dt class="text-sm text-muted-color">Estado</dt>
+              <dd class="mt-2">{{ client.accountBalance.amount > 0 ? "Deuda" : client.accountBalance.amount < 0 ? "Saldo a favor" : "Sin deuda" }}</dd></div>
+            <div><dt class="text-sm text-muted-color">Moneda</dt>
+              <dd class="mt-2">{{ client.accountBalance.currency }}</dd></div>
+            <div><dt class="text-sm text-muted-color">Última sincronización</dt>
+              <dd class="mt-2">{{ displayDateTime(client.accountBalance.synchronizedAt) }}</dd></div>
+            <div><dt class="text-sm text-muted-color">ID de saldo</dt>
+              <dd class="mt-2">{{ client.accountBalance.id }}</dd></div>
+            <div><dt class="text-sm text-muted-color">ID de cliente</dt>
+              <dd class="mt-2">{{ client.accountBalance.clientId }}</dd></div>
+          </dl>
+          <p v-else class="text-muted-color">Sin informar: no hay información de saldo para este cliente.</p>
+          <p class="mt-4 text-sm text-muted-color">Fotografía externa de solo lectura. Los pagos presentados o aprobados no actualizan este saldo automáticamente.</p>
+        </template>
+      </Card>
     </div> </template
   ><Skeleton v-else height="20rem" />
 </template>

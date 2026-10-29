@@ -1,6 +1,15 @@
 import { request } from "../../services/http";
 
+export interface AccountBalance {
+  id: number;
+  clientId: number;
+  amount: number;
+  currency: string;
+  synchronizedAt: string;
+}
+
 export interface Client {
+  accountBalance?: AccountBalance | null;
   id: number;
   firstname: string;
   lastname: string;

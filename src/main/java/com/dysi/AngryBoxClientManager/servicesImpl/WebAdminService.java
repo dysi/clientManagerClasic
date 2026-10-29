@@ -173,11 +173,18 @@ public class WebAdminService {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Los pagos no admiten anulación ni reactivación.");
     }
 
-    public Page<UserView> users(String keyword, Long clientId, int page, int size) {
+    public Page<UserView> users(String keyword, Long clientId, Boolean enabled, AuthorityName authority, int page, int size) {
         return users.findAll((Specification<User>) (root, query, cb) -> {
-            Predicate text = cb.or(like(cb, root.get("username"), keyword), like(cb, root.get("email"), keyword),
-                    like(cb, cb.concat(cb.concat(root.get("firstname"), " "), root.get("lastname")), keyword));
-            return clientId == null ? text : cb.and(text, cb.equal(root.get("client").get("id"), clientId));
+            List<Predicate> filters = new ArrayList<>();
+            filters.add(cb.or(like(cb, root.get("username"), keyword), like(cb, root.get("email"), keyword),
+                    like(cb, cb.concat(cb.concat(root.get("firstname"), " "), root.get("lastname")), keyword)));
+            if (clientId != null) filters.add(cb.equal(root.get("client").get("id"), clientId));
+            if (enabled != null) filters.add(cb.equal(root.get("enabled"), enabled));
+            if (authority != null) {
+                query.distinct(true);
+                filters.add(cb.equal(root.join("authorities").get("name"), authority));
+            }
+            return cb.and(filters.toArray(new Predicate[0]));
         }, page(page, size, keyword, "username", "id")).map(this::userView);
     }
 
@@ -207,9 +214,24 @@ public class WebAdminService {
         if (user.getUsername().equals(actor) && (!input.enabled || !input.roles.contains(AuthorityName.ROLE_ADMIN)))
             conflict("No podés deshabilitar tu propia cuenta ni quitarte el rol de administrador.");
         List<Authority> roles = new ArrayList<>();
+        List<Authority> configuredRoles = input.roles.contains(AuthorityName.ROLE_API)
+                ? authorities.findAllForAssignment() : authorities.findAll();
         for (AuthorityName role : new LinkedHashSet<>(input.roles)) {
-            Authority authority = authorities.findAll().stream().filter(a -> a.getName() == role).findFirst()
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "El rol " + role + " no está configurado en la base."));
+            Authority authority = configuredRoles.stream().filter(a -> a.getName() == role).findFirst()
+                    .orElseGet(() -> {
+                        if (role == AuthorityName.ROLE_API) {
+                            // Alta explícita al asignar el permiso. JPA conserva el generador de IDs de la instancia.
+                            Authority api = new Authority();
+                            api.setName(AuthorityName.ROLE_API);
+                            api = authorities.saveAndFlush(api);
+                            configuredRoles.add(api);
+                            return api;
+                        }
+                        return null;
+                    });
+            if (authority == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "El rol " + role + " no está configurado en la base.");
+            }
             roles.add(authority);
         }
         Client previous = user.getClient();

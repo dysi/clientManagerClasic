@@ -1,14 +1,13 @@
 package com.dysi.AngryBoxClientManager.restControllers;
 
-import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
+import com.dysi.AngryBoxClientManager.dtos.WebClientView;
+import com.dysi.AngryBoxClientManager.servicesImpl.WebClientReadService;
 import com.dysi.AngryBoxClientManager.dtos.ClientInput;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.repositories.ClientRepository;
 import java.net.URI;
 import javax.validation.Valid;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,26 +22,30 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Transactional(readOnly = true)
 public class WebClientController {
     private final ClientRepository clients;
-    public WebClientController(ClientRepository clients) { this.clients = clients; }
+    private final WebClientReadService reads;
+    public WebClientController(ClientRepository clients, WebClientReadService reads) {
+        this.clients = clients; this.reads = reads;
+    }
 
     @GetMapping
-    public Page<ClientDTO> list(@RequestParam(defaultValue = "") String keyword,
+    public Page<WebClientView> list(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "ALL") String balanceState,
+            @RequestParam(required = false) Integer staleDays,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        if (page < 0 || size < 1 || size > 100 || keyword.length() > 150) {
+        if (!java.util.Arrays.asList("ALL", "DEBT", "CREDIT", "ZERO", "UNKNOWN").contains(balanceState)
+                || (staleDays != null && !java.util.Arrays.asList(15, 30, 45, 60).contains(staleDays))
+                || page < 0 || size < 1 || size > 100 || keyword.length() > 150) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parámetros de búsqueda inválidos.");
         }
-        String escaped = keyword.trim().toLowerCase(java.util.Locale.ROOT)
-                .replace("!", "!!").replace("%", "!%").replace("_", "!_");
-        return clients.searchForWeb("%" + escaped + "%", PageRequest.of(page, size,
-                Sort.by("lastname", "firstname", "id"))).map(this::dto);
+        return reads.list(keyword, balanceState, staleDays, page, size);
     }
 
     @GetMapping("/{id}")
-    public ClientDTO detail(@PathVariable long id) { return dto(find(id)); }
+    public WebClientView detail(@PathVariable long id) { return dto(find(id)); }
 
     @PostMapping
     @Transactional
-    public ResponseEntity<ClientDTO> create(@Valid @RequestBody ClientInput input) {
+    public ResponseEntity<WebClientView> create(@Valid @RequestBody ClientInput input) {
         Client client = new Client();
         fill(client, input);
         clients.saveAndFlush(client);
@@ -52,7 +55,7 @@ public class WebClientController {
 
     @PutMapping("/{id}")
     @Transactional
-    public ClientDTO update(@PathVariable long id, @Valid @RequestBody ClientInput input) {
+    public WebClientView update(@PathVariable long id, @Valid @RequestBody ClientInput input) {
         Client client = find(id);
         fill(client, input);
         return dto(clients.saveAndFlush(client));
@@ -69,12 +72,7 @@ public class WebClientController {
         if (input.tradeName != null) client.setTradeName(input.tradeName);
         if (input.externalCode != null) client.setExternalCode(input.externalCode);
     }
-    private ClientDTO dto(Client client) {
-        ClientDTO result = new ClientDTO(client.getId(), client.getFirstname(), client.getLastname(), client.getEmail(),
-                client.getPhone(), client.getCuil(), client.getUser() == null ? null : client.getUser().getUsername());
-        result.setDni(client.getDni());
-        result.setLegalName(client.getLegalName()); result.setTradeName(client.getTradeName());
-        result.setExternalCode(client.getExternalCode());
-        return result;
+    private WebClientView dto(Client client) {
+        return reads.view(client);
     }
 }

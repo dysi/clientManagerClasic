@@ -176,7 +176,7 @@ async function cancel() { if (await discard()) await router.push("/portal"); }
         <FormField id="issuedTime" label="Hora de emisión" required v-slot="field">
           <InputText id="issuedTime" v-model="form.issuedTime" type="time" :disabled="saving" :aria-describedby="field.describedby" fluid />
         </FormField>
-        <FormField id="license" label="Licencia (opcional)" hint="Podés informar el pago sin asociarlo a una licencia." :error="fields.licenseId" v-slot="field">
+        <FormField v-if="limits?.sensitiveAccess" id="license" label="Licencia (opcional)" hint="Podés informar el pago sin asociarlo a una licencia." :error="fields.licenseId" v-slot="field">
           <EntitySelect input-id="license" v-model="form.licenseId" :label="licenseLabel" kind="portal-licenses" :disabled="saving" :invalid="field.invalid" :describedby="field.describedby" @selected="licenseLabel = $event?.label ?? ''" />
           <Button v-if="form.licenseId != null" type="button" label="Quitar licencia" text size="small" @click="form.licenseId = null" />
         </FormField>

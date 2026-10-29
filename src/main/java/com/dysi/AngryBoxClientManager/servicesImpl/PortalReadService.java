@@ -43,13 +43,18 @@ public class PortalReadService {
         view.name = client.getFirstname() == null ? "Cliente" : client.getFirstname();
         view.client = new PortalViews.ClientIdentity();
         view.client.firstname = client.getFirstname(); view.client.lastname = client.getLastname();
-        view.client.email = client.getEmail(); view.client.phone = client.getPhone();
-        view.client.dni = client.getDni(); view.client.cuil = client.getCuil();
-        LocalDate today = LocalDate.now();
-        view.licenses = licenses.portalTotals(clientId, calendar(today.plusDays(1)), calendar(today.plusDays(16)));
-        view.state = view.licenses.total == 0 ? "SIN_LICENCIAS"
-                : view.licenses.blocked + view.licenses.expired > 0 ? "CON_RESTRICCIONES"
-                : view.licenses.unknown > 0 ? "REVISAR_DATOS" : view.licenses.expiring > 0 ? "POR_VENCER" : "VIGENTE";
+        view.sensitiveAccess = principal.getOrigin() == OperationOrigin.ACCESO_AUTENTICADO;
+        if (view.sensitiveAccess) {
+            view.client.email = client.getEmail(); view.client.phone = client.getPhone();
+            view.client.dni = client.getDni(); view.client.cuil = client.getCuil();
+        }
+        if (view.sensitiveAccess) {
+            LocalDate today = LocalDate.now();
+            view.licenses = licenses.portalTotals(clientId, calendar(today.plusDays(1)), calendar(today.plusDays(16)));
+            view.state = view.licenses.total == 0 ? "SIN_LICENCIAS"
+                    : view.licenses.blocked + view.licenses.expired > 0 ? "CON_RESTRICCIONES"
+                    : view.licenses.unknown > 0 ? "REVISAR_DATOS" : view.licenses.expiring > 0 ? "POR_VENCER" : "VIGENTE";
+        }
         balances.findByClientIdAndRemoveDateIsNull(clientId).ifPresent(balance -> {
             PortalViews.Balance output = new PortalViews.Balance(); output.amount = balance.getAmount();
             output.currency = balance.getCurrency().name(); output.synchronizedAt = balance.getSynchronizedAt();
@@ -60,6 +65,7 @@ public class PortalReadService {
     }
 
     public Page<PortalViews.License> licenses(PortalPrincipal principal, String keyword, int page, int size) {
+        access.requireSensitiveAccess(principal);
         Long clientId = access.revalidate(principal).getClientId();
         return licenses.findAll(ownLicenses(clientId, keyword), page(page, size, "companyName", "id"))
                 .map(license -> {
@@ -89,7 +95,8 @@ public class PortalReadService {
     public PortalViews.FormContext form(PortalPrincipal principal) {
         Long clientId = access.revalidate(principal).getClientId();
         PortalViews.FormContext form = new PortalViews.FormContext();
-        form.contactPhone = clients.findById(clientId).orElseThrow(this::missing).getPhone();
+        form.sensitiveAccess = principal.getOrigin() == OperationOrigin.ACCESO_AUTENTICADO;
+        if (form.sensitiveAccess) form.contactPhone = clients.findById(clientId).orElseThrow(this::missing).getPhone();
         // Es un catálogo pequeño de cuentas disponibles; el formulario lo presenta completo.
         form.accounts = accounts.findAll(availableAccounts(), Sort.by("bank.name", "id")).stream()
                 .map(this::accountView).collect(Collectors.toList());
@@ -101,21 +108,27 @@ public class PortalReadService {
 
     public Page<PortalViews.Payment> payments(PortalPrincipal principal, int page, int size) {
         Long clientId = access.revalidate(principal).getClientId();
+        LocalDateTime now = LocalDateTime.now();
         Page<Payment> results = payments.findAll((Specification<Payment>) (root, query, cb) -> cb.and(
-                cb.equal(root.get("client").get("id"), clientId), cb.isNull(root.get("removeDate"))),
+                cb.equal(root.get("client").get("id"), clientId), cb.isNull(root.get("removeDate")),
+                cb.between(root.get("issuedAt"), now.minusDays(45), now)),
                 PageRequest.of(page(page, size, "id").getPageNumber(), size, Sort.by(Sort.Direction.DESC, "id")));
         List<Long> ids = results.stream().map(Payment::getId).collect(Collectors.toList());
         Map<Long, String> rejectionReasons = ids.isEmpty() ? Map.of() : histories.findByPaymentIdInAndNewStatus(ids, PaymentStatus.RECHAZADO)
                 .stream().collect(Collectors.toMap(event -> event.getPayment().getId(), PaymentStatusHistory::getReason));
         Map<Long, Long> counts = new HashMap<>();
         if (!ids.isEmpty()) for (Object[] row : comments.publicCounts(ids)) counts.put((Long) row[0], (Long) row[1]);
+        Map<Long, Long> receiptCounts = new HashMap<>();
+        if (!ids.isEmpty()) for (Object[] row : attachments.activeCounts(ids)) receiptCounts.put((Long) row[0], (Long) row[1]);
         return results.map(payment -> {
             PortalViews.Payment view = paymentView(payment, rejectionReasons.get(payment.getId()));
-            view.commentCount = counts.getOrDefault(payment.getId(), 0L); return view;
+            view.commentCount = counts.getOrDefault(payment.getId(), 0L);
+            view.receiptCount = receiptCounts.getOrDefault(payment.getId(), 0L); return view;
         });
     }
 
     public PortalViews.PaymentDetail detail(PortalPrincipal principal, Long id) {
+        access.requireSensitiveAccess(principal);
         Long clientId = access.revalidate(principal).getClientId();
         Payment payment = payments.findByIdAndClientIdAndRemoveDateIsNull(id, clientId).orElseThrow(this::missing);
         String reason = histories.findByPaymentIdInAndNewStatus(List.of(id), PaymentStatus.RECHAZADO)
@@ -130,6 +143,7 @@ public class PortalReadService {
     }
 
     public Page<PortalViews.Receipt> receipts(PortalPrincipal principal, Long id, int page, int size) {
+        access.requireSensitiveAccess(principal);
         Long clientId = access.revalidate(principal).getClientId();
         payments.findByIdAndClientIdAndRemoveDateIsNull(id, clientId).orElseThrow(this::missing);
         return attachments.ownReceipts(id, clientId, page(page, size, "id")).map(link -> {
@@ -140,6 +154,7 @@ public class PortalReadService {
     }
 
     public Page<PortalViews.Comment> comments(PortalPrincipal principal, Long paymentId, int page, int size) {
+        access.requireSensitiveAccess(principal);
         Long clientId = access.revalidate(principal).getClientId();
         payments.findByIdAndClientIdAndRemoveDateIsNull(paymentId, clientId).orElseThrow(this::missing);
         return comments.publicComments(paymentId, clientId, page(page, size, "id")).map(link -> {

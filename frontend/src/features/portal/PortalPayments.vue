@@ -9,13 +9,14 @@ import ListPaginator from "../../components/ListPaginator.vue";
 import { usePagedList } from "../../composables/usePagedList";
 import { displayDateTime, money } from "../../services/format";
 import type { PortalPayment } from "../../services/portal";
+defineProps<{ sensitiveAccess: boolean }>();
 const { rows, loading, error, page, size, total, paginate } = usePagedList<PortalPayment>("/web/portal/payments");
 const labels = { PENDIENTE: "Pendiente", APROBADO: "Aprobado", RECHAZADO: "Rechazado" };
 </script>
 <template>
   <Card>
     <template #title><div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <span>Mis pagos informados</span>
+      <span>Mis pagos informados <span class="text-base font-normal text-muted-color">(últimos 45 días)</span></span>
       <Button as="router-link" to="/portal/payments/new" label="Informar un nuevo pago" icon="pi pi-plus-circle" size="large" class="w-full sm:w-auto" />
     </div></template>
     <template #subtitle>Informar un pago no modifica automáticamente tu saldo ni la vigencia de tus licencias.</template>
@@ -36,7 +37,8 @@ const labels = { PENDIENTE: "Pendiente", APROBADO: "Aprobado", RECHAZADO: "Recha
         <Column header="Comentarios"><template #body="{ data }">
           <span :aria-label="`${data.commentCount} comentarios públicos`">{{ data.commentCount }}</span>
         </template></Column>
-        <Column header="Detalle"><template #body="{ data }">
+        <Column header="Archivos Adjuntos" field="receiptCount" />
+        <Column v-if="sensitiveAccess" header="Detalle"><template #body="{ data }">
           <Button as="router-link" :to="`/portal/payments/${data.id}`" label="Ver detalle" icon="pi pi-eye" text size="small" />
         </template></Column>
       </DataTable>

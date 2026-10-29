@@ -28,7 +28,7 @@ public final class AdminInputs {
         @NotBlank @Size(min = 4, max = 50) public String lastname;
         @NotBlank @Email @Size(max = 50) public String email;
         @NotNull public Boolean enabled;
-        @NotEmpty @Size(max = 3) public List<@NotNull AuthorityName> roles;
+        @NotEmpty @Size(max = 4) public List<@NotNull AuthorityName> roles;
         @Positive public Long clientId;
     }
 

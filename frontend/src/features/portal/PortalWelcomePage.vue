@@ -26,7 +26,7 @@ onMounted(async () => {
   <Message v-else-if="error" severity="error" role="alert">{{ error }}</Message>
   <template v-else-if="overview">
     <PageHeader :title="'Cuenta de ' + ([overview.client.firstname, overview.client.lastname].filter(Boolean).join(' ') || overview.name)" description="Revisá los datos de tu cuenta y consultá tus pagos y saldo informado." />
-    <Card class="mb-6"><template #title>Datos de tu cuenta</template><template #content>
+    <Card v-if="overview.sensitiveAccess" class="mb-6"><template #title>Datos de tu cuenta</template><template #content>
       <dl class="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div><dt class="text-sm text-muted-color">DNI</dt><dd class="break-all">{{ overview.client.dni || 'Sin registrar' }}</dd></div>
         <div><dt class="text-sm text-muted-color">CUIL / CUIT</dt><dd class="break-all">{{ overview.client.cuil || 'Sin registrar' }}</dd></div>
@@ -34,8 +34,8 @@ onMounted(async () => {
         <div><dt class="text-sm text-muted-color">Teléfono</dt><dd class="break-all">{{ overview.client.phone || 'Sin registrar' }}</dd></div>
       </dl>
     </template></Card>
-    <div class="mb-6 grid gap-6 lg:grid-cols-2">
-      <Card><template #title>Estado general</template><template #content>
+    <div class="mb-6 grid gap-6" :class="{ 'lg:grid-cols-2': overview.sensitiveAccess }">
+      <Card v-if="overview.sensitiveAccess && overview.licenses && overview.state"><template #title>Estado general</template><template #content>
         <p class="font-medium">{{ overviewLabels[overview.state] }}</p>
         <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
           <div><dt class="text-muted-color">Licencias</dt><dd>{{ overview.licenses.total }}</dd></div>
@@ -57,15 +57,14 @@ onMounted(async () => {
         <template v-if="overview.balance">
           <p class="text-sm text-muted-color">{{ overview.balance.state === 'DEUDA' ? 'Deuda' : overview.balance.state === 'A_FAVOR' ? 'Saldo a favor' : 'Sin deuda' }}</p>
           <p class="mt-2 text-3xl font-semibold">{{ money(Math.abs(overview.balance.amount)) }}</p>
-          <p class="mt-3 text-sm text-muted-color">Última sincronización: {{ displayDateTime(overview.balance.synchronizedAt) }}</p>
+          <p class="mt-3 text-sm text-muted-color">Informado: {{ displayDateTime(overview.balance.synchronizedAt) }}</p>
         </template>
         <Message v-else severity="info" :closable="false">Saldo aún no disponible</Message>
-        <p class="mt-4 text-sm text-muted-color">Este saldo corresponde a la última información recibida de AngryBox. Los pagos informados no lo modifican automáticamente.</p>
       </template></Card>
     </div>
-    <PortalPayments class="mb-6" />
+    <PortalPayments :sensitive-access="overview.sensitiveAccess" class="mb-6" />
     <div class="flex flex-col gap-6">
-      <Panel v-model:collapsed="licensesCollapsed" header="Mis licencias" toggleable :toggle-button-props="{ 'aria-label': licensesCollapsed ? 'Mostrar mis licencias' : 'Ocultar mis licencias' }">
+      <Panel v-if="overview.sensitiveAccess" v-model:collapsed="licensesCollapsed" header="Mis licencias" toggleable :toggle-button-props="{ 'aria-label': licensesCollapsed ? 'Mostrar mis licencias' : 'Ocultar mis licencias' }">
         <template #toggleicon="{ collapsed }"><i :class="['pi', collapsed ? 'pi-chevron-down' : 'pi-chevron-up']" aria-hidden="true" /></template>
         <PortalLicenses v-if="!licensesCollapsed" />
       </Panel>

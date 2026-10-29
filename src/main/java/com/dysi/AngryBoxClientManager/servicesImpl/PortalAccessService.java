@@ -53,6 +53,13 @@ public class PortalAccessService {
         return new PortalPrincipal(client.getId(), user, OperationOrigin.ACCESO_AUTENTICADO);
     }
 
+    /** El documento identifica la cuenta, pero no acredita al titular. */
+    public void requireSensitiveAccess(PortalPrincipal principal) {
+        if (revalidate(principal).getOrigin() != OperationOrigin.ACCESO_AUTENTICADO) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ingresá con usuario y contraseña para consultar esta información.");
+        }
+    }
+
     public boolean isActiveUser(JwtUser principal) {
         return users.findById(principal.getId())
                 .filter(user -> user.getRemoveDate() == null && Boolean.TRUE.equals(user.getEnabled())).isPresent();

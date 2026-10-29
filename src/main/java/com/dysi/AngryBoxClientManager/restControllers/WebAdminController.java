@@ -3,6 +3,7 @@ package com.dysi.AngryBoxClientManager.restControllers;
 import com.dysi.AngryBoxClientManager.dtos.AdminInputs.*;
 import com.dysi.AngryBoxClientManager.dtos.AdminViews.*;
 import com.dysi.AngryBoxClientManager.servicesImpl.WebAdminService;
+import com.dysi.AngryBoxClientManager.models.AuthorityName;
 import java.security.Principal;
 import java.util.List;
 import javax.validation.Valid;
@@ -50,8 +51,10 @@ public class WebAdminController {
     @PutMapping("/payments/{id}/status") public PaymentView paymentStatus(@PathVariable long id, @Valid @RequestBody PaymentStatusInput input) { return service.paymentStatus(id, input.removed); }
 
     @GetMapping("/users") public Page<UserView> users(@RequestParam(defaultValue = "") String keyword,
-            @RequestParam(required = false) Long clientId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return service.users(keyword, clientId, page, size);
+            @RequestParam(required = false) Long clientId, @RequestParam(required = false) Boolean enabled,
+            @RequestParam(required = false) AuthorityName authority,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
+        return service.users(keyword, clientId, enabled, authority, page, size);
     }
     @GetMapping("/users/{id}") public UserView user(@PathVariable long id) { return service.user(id); }
     @PostMapping("/users") @ResponseStatus(HttpStatus.CREATED)

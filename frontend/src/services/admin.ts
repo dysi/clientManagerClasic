@@ -59,6 +59,7 @@ export const roleOptions = [
   { label: "Administrador", value: "ROLE_ADMIN" },
   { label: "Usuario", value: "ROLE_USER" },
   { label: "Vendedor", value: "ROLE_SELLER" },
+  { label: "Acceso API", value: "ROLE_API" },
 ];
 export function detail<T>(kind: string, id: number) {
   return request<T>(`/web/api/${kind}/${id}`);

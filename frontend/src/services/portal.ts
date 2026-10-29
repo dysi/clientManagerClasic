@@ -34,6 +34,7 @@ export function appendReceipts(id: number, uploadKey: string, receipts: ReceiptS
 }
 export interface PortalPayment {
   commentCount: number;
+  receiptCount: number;
   id: number;
   amount: number;
   currency: string;
@@ -44,13 +45,14 @@ export interface PortalPayment {
 }
 export interface PortalComment { id: number; text: string; occurredAt: string }
 export interface PortalOverview {
+  sensitiveAccess: boolean;
   client: { firstname: string | null; lastname: string | null; email: string | null; phone: string | null; dni: string | null; cuil: string | null };
   name: string;
-  state: "SIN_LICENCIAS" | "CON_RESTRICCIONES" | "REVISAR_DATOS" | "POR_VENCER" | "VIGENTE";
+  state: "SIN_LICENCIAS" | "CON_RESTRICCIONES" | "REVISAR_DATOS" | "POR_VENCER" | "VIGENTE" | null;
   balance: null | { amount: number; currency: string; state: "DEUDA" | "A_FAVOR" | "SIN_DEUDA"; synchronizedAt: string };
-  licenses: { total: number; blocked: number; expired: number; expiring: number; unknown: number };
+  licenses: { total: number; blocked: number; expired: number; expiring: number; unknown: number } | null;
 }
-export interface PaymentFormContext { accounts: PortalAccount[]; suggestedAmount: number | null; contactPhone: string | null; maxReceipts: number; maxFileBytes: number }
+export interface PaymentFormContext { sensitiveAccess: boolean; accounts: PortalAccount[]; suggestedAmount: number | null; contactPhone: string | null; maxReceipts: number; maxFileBytes: number }
 export interface PortalSubmission {
   bankAccountId: number;
   accountRevision: string;
@@ -71,7 +73,7 @@ export function submitPayment(data: PortalSubmission, receipts: File[]) {
   for (const file of receipts) body.append("receipts", file);
   return request<PortalPayment>("/web/portal/payments", { method: "POST", body });
 }
-export const overviewLabels: Record<PortalOverview["state"], string> = {
+export const overviewLabels: Record<NonNullable<PortalOverview["state"]>, string> = {
   SIN_LICENCIAS: "Sin licencias registradas", CON_RESTRICCIONES: "Tenés licencias bloqueadas o vencidas",
   REVISAR_DATOS: "Hay datos de vigencia por revisar", POR_VENCER: "Tenés licencias por vencer", VIGENTE: "Tus licencias están vigentes",
 };

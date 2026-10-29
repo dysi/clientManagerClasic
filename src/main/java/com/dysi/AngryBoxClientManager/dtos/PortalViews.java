@@ -9,6 +9,7 @@ public final class PortalViews {
     private PortalViews() { }
 
     public static class Overview {
+        public boolean sensitiveAccess;
         public String name, state;
         public ClientIdentity client;
         public Balance balance;
@@ -41,7 +42,7 @@ public final class PortalViews {
         public String bank, holder, cbu, alias, revision;
     }
     public static class Payment {
-        public long commentCount;
+        public long commentCount, receiptCount;
         public Long id;
         public BigDecimal amount;
         public String currency, status, companyName, rejectionReason;
@@ -65,6 +66,7 @@ public final class PortalViews {
         public LocalDateTime occurredAt;
     }
     public static class FormContext {
+        public boolean sensitiveAccess;
         public BigDecimal suggestedAmount;
         public java.util.List<Account> accounts;
         public String contactPhone;
