@@ -40,6 +40,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + " or (:balanceState = 'DEBT' and b.amount > 0)"
             + " or (:balanceState = 'CREDIT' and b.amount < 0)"
             + " or (:balanceState = 'ZERO' and b.amount = 0))"
+            + " and (:clientStatus = 'ALL' or (:clientStatus = 'ACTIVE' and c.removeDate is null)"
+            + " or (:clientStatus = 'REMOVED' and c.removeDate is not null))"
             + " and (:staleBefore is null or b.synchronizedAt < :staleBefore)",
             countQuery = "select count(c) from Client c left join c.user u left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
@@ -53,26 +55,29 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + " or (:balanceState = 'DEBT' and b.amount > 0)"
             + " or (:balanceState = 'CREDIT' and b.amount < 0)"
             + " or (:balanceState = 'ZERO' and b.amount = 0))"
+            + " and (:clientStatus = 'ALL' or (:clientStatus = 'ACTIVE' and c.removeDate is null)"
+            + " or (:clientStatus = 'REMOVED' and c.removeDate is not null))"
             + " and (:staleBefore is null or b.synchronizedAt < :staleBefore)")
     org.springframework.data.domain.Page<Client> searchForWeb(@Param("keyword") String keyword,
             @Param("balanceState") String balanceState,
+            @Param("clientStatus") String clientStatus,
             @Param("staleBefore") java.time.LocalDateTime staleBefore,
             org.springframework.data.domain.Pageable pageable);
 	
     default org.springframework.data.domain.Page<Client> searchForWeb(String keyword,
             org.springframework.data.domain.Pageable pageable) {
-        return searchForWeb(keyword, "ALL", null, pageable);
+        return searchForWeb(keyword, "ALL", "ALL", null, pageable);
     }
 
     public Client findClientByUser(User user);
 
     // Serializa presentaciones de un cliente para resolver reenvíos sin duplicar evidencia.
     @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @Query("select c from Client c where c.id = :id and c.removeDate is null")
+    @Query("select c from Client c where c.id = :id")
     java.util.Optional<Client> lockPortalClient(@Param("id") Long id);
 
     // Filtrar y limitar en BD; no cargar el padrón de documentos en memoria.
-    @Query("select c.id from Client c where c.removeDate is null and "
+    @Query("select c.id from Client c where "
             + "((:type = 'CUIT' and " + NORMALIZED_CUIT + " = :document) "
             + "or (:type = 'DNI' and ((length(c.dni) > 0 and function('lpad', c.dni, 8, '0') = :dni) "
             + "or (length(" + NORMALIZED_CUIT + ") = 11 and length(" + CUIT_WITHOUT_DIGITS + ") = 0 "
@@ -80,7 +85,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     List<Long> findPortalDocumentMatches(@Param("type") String type, @Param("document") String document,
             @Param("dni") String dni, org.springframework.data.domain.Pageable pageable);
 
-    @Query("select c.id from Client c where c.user.id = :userId and c.removeDate is null")
+    @Query("select c.id from Client c where c.user.id = :userId")
     List<Long> findPortalClientsForUser(@Param("userId") Long userId,
             org.springframework.data.domain.Pageable pageable);
 

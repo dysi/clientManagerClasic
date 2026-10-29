@@ -34,9 +34,13 @@ public class WebClientReadService {
     }
 
     public Page<WebClientView> list(String keyword, String balanceState, Integer staleDays, int page, int size) {
+        return list(keyword, balanceState, "ALL", staleDays, page, size);
+    }
+
+    public Page<WebClientView> list(String keyword, String balanceState, String clientStatus, Integer staleDays, int page, int size) {
         String escaped = keyword.trim().toLowerCase(java.util.Locale.ROOT)
                 .replace("!", "!!").replace("%", "!%").replace("_", "!_");
-        Page<Client> result = clients.searchForWeb("%" + escaped + "%", balanceState,
+        Page<Client> result = clients.searchForWeb("%" + escaped + "%", balanceState, clientStatus,
                 staleDays == null ? null : LocalDateTime.now(balanceZone).minusDays(staleDays),
                 PageRequest.of(page, size, Sort.by("lastname", "firstname", "id")));
         Map<Long, ClientAccountBalance> byClient = new HashMap<>();
@@ -44,6 +48,16 @@ public class WebClientReadService {
                 .map(Client::getId).collect(Collectors.toList()))
                 .forEach(balance -> byClient.put(balance.getClient().getId(), balance));
         return result.map(client -> new WebClientView(client, byClient.get(client.getId())));
+    }
+
+    /** La baja reutiliza el evento y actor de auditoría, sin alterar licencias. */
+    @Transactional
+    public WebClientView status(long id, boolean removed) {
+        Client client = clients.lockPortalClient(id).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND, "No se encontró el cliente."));
+        if (removed) client.markRemoved(); else client.restore();
+        clients.saveAndFlush(client);
+        return view(client);
     }
 
     public WebClientView view(Client client) {

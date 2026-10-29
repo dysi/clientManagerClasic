@@ -20,7 +20,7 @@ public final class AdminViews {
         public String clientName, companyName, description, status;
         public LocalDate initialActivity, lockDate;
         public Long daysUntilLock;
-        public boolean prePayment, locked;
+        public boolean prePayment, locked, hidden, clientRemoved;
     }
 
     public static class PaymentCounts {

@@ -85,7 +85,7 @@ public class PortalAccessService {
 
     private User associatedUser(Client client) {
         User user = client.getUser();
-        if (client.getRemoveDate() != null || user == null || user.getRemoveDate() != null
+        if (user == null || user.getRemoveDate() != null
                 || !Boolean.TRUE.equals(user.getEnabled()) || user.getClient() == null
                 || !Objects.equals(user.getClient().getId(), client.getId())) throw denied();
         List<Long> matches = clients.findPortalClientsForUser(user.getId(), PageRequest.of(0, 2));

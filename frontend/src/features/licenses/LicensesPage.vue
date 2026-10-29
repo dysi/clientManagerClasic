@@ -24,6 +24,16 @@ const route = useRoute();
 const toast = useToast();
 const confirm = useConfirmAction();
 const status = ref("ALL");
+const clientStatus = ref("ACTIVE");
+const visibility = ref("VISIBLE");
+const clientStates = [
+  { label: "Todos", value: "ALL" }, { label: "Activos", value: "ACTIVE" },
+  { label: "Dados de baja", value: "REMOVED" },
+];
+const visibilityOptions = [
+  { label: "Todos", value: "ALL" }, { label: "Visibles", value: "VISIBLE" },
+  { label: "Ocultos", value: "HIDDEN" },
+];
 const acting = ref<number>();
 const initialClientId = Number(route.query.clientId);
 const clientId = ref<number | null>(
@@ -53,6 +63,8 @@ const {
   load,
 } = usePagedList<License>("/web/api/licenses", () => ({
   status: status.value,
+  clientStatus: clientStatus.value,
+  visibility: visibility.value,
   clientId: clientId.value,
 }));
 onMounted(async () => {
@@ -76,6 +88,7 @@ function filterClient(id: number | null) {
   void search();
 }
 async function changeLock(license: License) {
+  if (acting.value != null) return;
   const locked = !license.locked;
   if (
     !(await confirm(
@@ -101,6 +114,20 @@ async function changeLock(license: License) {
   } finally {
     acting.value = undefined;
   }
+}
+async function changeVisibility(license: License) {
+  if (acting.value != null) return;
+  const hidden = !license.hidden;
+  if (!(await confirm(`¿${hidden ? "Ocultar" : "Hacer visible"} la licencia de ${license.companyName}?${hidden ? " Dejará de aparecer en el portal y en el listado de visibles." : ""}`))) return;
+  acting.value = license.id;
+  error.value = "";
+  try {
+    await request(`/web/api/licenses/${license.id}/visibility`, { method: "PUT", body: JSON.stringify({ hidden }) });
+    await load();
+    toast.add({ severity: "success", summary: "Visibilidad actualizada", life: 3500 });
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : "No se pudo actualizar la visibilidad.";
+  } finally { acting.value = undefined; }
 }
 </script>
 <template>
@@ -147,6 +174,14 @@ async function changeLock(license: License) {
             severity="secondary"
             @click="filterClient(null)"
           />
+          <FormField id="license-client-status" label="Estado Cliente">
+            <Select aria-label="Estado Cliente" input-id="license-client-status" v-model="clientStatus" :options="clientStates"
+              option-label="label" option-value="value" @change="search" />
+          </FormField>
+          <FormField id="license-visibility" label="Visibilidad">
+            <Select aria-label="Visibilidad" input-id="license-visibility" v-model="visibility" :options="visibilityOptions"
+              option-label="label" option-value="value" @change="search" />
+          </FormField>
           <FormField id="license-status-filter" label="Estado">
             <Select
               input-id="license-status-filter"
@@ -158,6 +193,7 @@ async function changeLock(license: License) {
               @change="search"
           /></FormField></div
       ></ListToolbar>
+      <div class="min-w-0 overflow-x-auto">
       <DataTable
         :value="rows"
         :loading="loading"
@@ -175,7 +211,9 @@ async function changeLock(license: License) {
             ><span class="font-medium">{{ data.companyName }}</span>
             <p class="mt-1 text-sm text-muted-color">
               Empresa #{{ data.companyId }} · {{ data.clientName }}
-            </p></template
+            </p>
+            <p v-if="data.clientRemoved" class="mt-1 text-sm font-medium text-red-700 dark:text-red-300">Cliente dado de baja: bloqueo indirecto de la licencia.</p>
+            <p v-if="data.hidden" class="mt-1 text-sm text-muted-color">Oculta en el portal</p></template
           ></Column
         >
         <Column header="Fecha de bloqueo"
@@ -218,9 +256,12 @@ async function changeLock(license: License) {
                 :loading="acting === data.id"
                 :disabled="acting != null"
                 @click="changeLock(data)"
-              /></div></template
+              /><Button v-if="data.locked || data.hidden" type="button"
+                :label="data.hidden ? 'Hacer visible' : 'Ocultar'" :icon="data.hidden ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                text size="small" :loading="acting === data.id" :disabled="acting != null"
+                @click="changeVisibility(data)" /></div></template
         ></Column> </DataTable
-      ><ListPaginator
+      ></div><ListPaginator
         :page="page"
         :size="size"
         :total="total"

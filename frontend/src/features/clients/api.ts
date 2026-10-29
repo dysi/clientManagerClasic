@@ -9,6 +9,7 @@ export interface AccountBalance {
 }
 
 export interface Client {
+  removed: boolean;
   accountBalance?: AccountBalance | null;
   id: number;
   firstname: string;

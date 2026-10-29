@@ -20,6 +20,8 @@ export interface License {
   daysUntilLock: number | null;
   prePayment: boolean;
   locked: boolean;
+  hidden: boolean;
+  clientRemoved: boolean;
   status: string;
 }
 export type LicenseInput = Pick<

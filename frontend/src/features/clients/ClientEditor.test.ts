@@ -10,6 +10,7 @@ import { clientsApi, type Client } from "./api";
 import { ApiError } from "../../services/http";
 
 const client: Client = {
+  removed: false,
   id: 7,
   firstname: "Ana",
   lastname: "Pérez",

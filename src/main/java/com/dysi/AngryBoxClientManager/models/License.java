@@ -32,6 +32,14 @@ public class License extends AuditableEntity {
     @Column(name = "PREPAYMENT")
     private boolean prePayment;
 
+    // Visibilidad independiente del bloqueo y la baja.
+    @Column(name = "HIDDEN", nullable = false)
+    private boolean hidden;
+
+    @JsonIgnore
+    public boolean isHidden() { return hidden; }
+    public void setHidden(boolean hidden) { this.hidden = hidden; }
+
     @ManyToOne
     private Client client;
 

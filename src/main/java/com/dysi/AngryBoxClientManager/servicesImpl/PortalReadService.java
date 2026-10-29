@@ -174,7 +174,7 @@ public class PortalReadService {
         if (keyword == null || keyword.length() > 150) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Búsqueda inválida.");
         String pattern = "%" + keyword.trim().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
         return (root, query, cb) -> cb.and(cb.equal(root.get("client").get("id"), clientId),
-                cb.isNull(root.get("removeDate")), cb.like(cb.lower(cb.coalesce(root.get("companyName"), "")), pattern, '!'));
+                cb.isNull(root.get("removeDate")), cb.isFalse(root.get("hidden")), cb.like(cb.lower(cb.coalesce(root.get("companyName"), "")), pattern, '!'));
     }
     private Pageable page(int page, int size, String... sort) {
         if (page < 0 || size < 1 || size > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paginación inválida.");

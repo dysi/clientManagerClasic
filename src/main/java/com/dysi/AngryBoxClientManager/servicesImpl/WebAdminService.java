@@ -34,6 +34,13 @@ public class WebAdminService {
     }
 
     public Page<LicenseView> licenses(String keyword, Long clientId, String status, int page, int size) {
+        return licenses(keyword, clientId, status, "ALL", "ALL", page, size);
+    }
+
+    public Page<LicenseView> licenses(String keyword, Long clientId, String status, String clientStatus,
+            String visibility, int page, int size) {
+        if (!Set.of("ALL", "ACTIVE", "REMOVED").contains(clientStatus)
+                || !Set.of("ALL", "VISIBLE", "HIDDEN").contains(visibility)) bad("Filtros de licencia inválidos.");
         Pageable paging = page(page, size, keyword, "companyName", "id");
         if (!Set.of("ALL", "ACTIVE", "EXPIRING", "EXPIRED", "BLOCKED").contains(status)) bad("Estado de licencia inválido.");
         Specification<License> specification = (root, query, cb) -> {
@@ -42,6 +49,9 @@ public class WebAdminService {
             filters.add(cb.or(like(cb, root.get("companyName"), keyword), like(cb, root.get("description"), keyword),
                     like(cb, cb.concat(cb.concat(client.get("firstname"), " "), client.get("lastname")), keyword),
                     like(cb, client.get("legalName"), keyword), like(cb, client.get("tradeName"), keyword)));
+            if (!"ALL".equals(clientStatus)) filters.add("ACTIVE".equals(clientStatus)
+                    ? cb.isNull(client.get("removeDate")) : cb.isNotNull(client.get("removeDate")));
+            if (!"ALL".equals(visibility)) filters.add(cb.equal(root.get("hidden"), "HIDDEN".equals(visibility)));
             if (clientId != null) filters.add(cb.equal(client.get("id"), clientId));
             if (!"ALL".equals(status)) {
                 Join<License, LicenseStatus> state = root.join("licenseStatuses");
@@ -96,6 +106,16 @@ public class WebAdminService {
         state.setForcedLock(locked);
         licenses.saveAndFlush(license);
         return licenseView(license);
+    }
+
+    @Transactional
+    public LicenseView visibility(long id, boolean hidden) {
+        License license = licenses.lockById(id).orElseThrow(() -> missing("licencia"));
+        LicenseStatus state = currentState(license);
+        if (hidden && !license.isHidden() && (state == null || !state.isForcedLock()))
+            conflict("Solo podés ocultar una licencia con bloqueo forzado.");
+        license.setHidden(hidden);
+        return licenseView(licenses.saveAndFlush(license));
     }
 
     public Page<PaymentView> payments(String keyword, Long licenseId, String status, int page, int size) {
@@ -273,6 +293,8 @@ public class WebAdminService {
 
     static LicenseView licenseView(License license) {
         LicenseView view = new LicenseView();
+        view.hidden = license.isHidden();
+        view.clientRemoved = license.getClient() != null && license.getClient().getRemoveDate() != null;
         view.id = license.getId(); view.companyId = license.getCompanyId(); view.companyName = license.getCompanyName();
         view.description = license.getDescription(); view.clientId = license.getClient() == null ? null : license.getClient().getId();
         view.clientName = clientName(license.getClient()); view.initialActivity = date(license.getInitialActivity()); view.prePayment = license.isPrePayment();

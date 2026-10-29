@@ -21,9 +21,12 @@ public class WebAdminController {
 
     @GetMapping("/licenses") public Page<LicenseView> licenses(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long clientId, @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(defaultValue = "ACTIVE") String clientStatus, @RequestParam(defaultValue = "VISIBLE") String visibility,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return service.licenses(keyword, clientId, status, page, size);
+        return service.licenses(keyword, clientId, status, clientStatus, visibility, page, size);
     }
+    @PutMapping("/licenses/{id}/visibility") public LicenseView visibility(@PathVariable long id, @Valid @RequestBody VisibilityInput input) { return service.visibility(id, input.hidden); }
+
     @GetMapping("/licenses/{id}") public LicenseView license(@PathVariable long id) { return service.license(id); }
     @PostMapping("/licenses") @ResponseStatus(HttpStatus.CREATED)
     public LicenseView createLicense(@Valid @RequestBody LicenseInput input) { return service.saveLicense(null, input); }

@@ -7,11 +7,22 @@ import Card from "primevue/card";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Message from "primevue/message";
+import Tag from "primevue/tag";
 import PageHeader from "../../components/PageHeader.vue";
 import ListToolbar from "../../components/ListToolbar.vue";
 import ListPaginator from "../../components/ListPaginator.vue";
 import { usePagedList } from "../../composables/usePagedList";
 import type { Client } from "./api";
+import { useConfirmAction } from "../../composables/useConfirmAction";
+import { request } from "../../services/http";
+const confirm = useConfirmAction();
+const acting = ref<number>();
+const status = ref("ACTIVE");
+const statusOptions = [
+  { label: "Todos", value: "ALL" },
+  { label: "Activos", value: "ACTIVE" },
+  { label: "Dados de baja", value: "REMOVED" },
+];
 const balanceState = ref("ALL");
 const staleDays = ref(0);
 const balanceOptions = [
@@ -25,8 +36,26 @@ const syncOptions = [
   { label: "Cualquier fecha", value: 0 },
   ...[15, 30, 45, 60].map(value => ({ label: `Sin sincronizar hace más de ${value} días`, value })),
 ];
-const { rows, keyword, loading, error, page, size, total, search, paginate } =
-  usePagedList<Client>("/web/api/clients", () => ({ balanceState: balanceState.value, staleDays: staleDays.value || null }));
+const { rows, keyword, loading, error, page, size, total, search, paginate, load } =
+  usePagedList<Client>("/web/api/clients", () => ({ status: status.value, balanceState: balanceState.value, staleDays: staleDays.value || null }));
+function clientRowClass(client: Client) {
+  return client.removed ? "bg-red-100! hover:bg-red-200!" : undefined;
+}
+async function changeStatus(client: Client) {
+  if (acting.value != null) return;
+  const removed = !client.removed;
+  if (!(await confirm(removed
+    ? `¿Dar de baja a ${client.firstname} ${client.lastname}? Todas sus licencias quedarán bloqueadas indirectamente. El acceso al portal se conserva.`
+    : `¿Dar de alta a ${client.firstname} ${client.lastname}? Sus licencias conservarán sus bloqueos y vencimientos propios.`))) return;
+  acting.value = client.id;
+  error.value = "";
+  try {
+    await request(`/web/api/clients/${client.id}/status`, { method: "PUT", body: JSON.stringify({ removed }) });
+    await load();
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : "No se pudo actualizar el cliente.";
+  } finally { acting.value = undefined; }
+}
 </script>
 <template>
   <PageHeader
@@ -47,7 +76,12 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
         placeholder="Nombre, razón social, fantasía, correo, CUIL o usuario"
         @search="search"
       />
-      <div class="mb-5 grid gap-4 sm:grid-cols-2">
+      <div class="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="flex flex-col gap-2">
+          <label for="client-status">Estado</label>
+          <Select aria-label="Estado" input-id="client-status" v-model="status" :options="statusOptions"
+            option-label="label" option-value="value" @change="search" />
+        </div>
         <div class="flex flex-col gap-2">
           <label for="balance-state">Saldo del cliente</label>
           <Select aria-label="Saldo del cliente" input-id="balance-state" v-model="balanceState" :options="balanceOptions"
@@ -69,6 +103,7 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
         :loading="loading"
         data-key="id"
         row-hover
+        :row-class="clientRowClass"
         striped-rows
         scrollable
       >
@@ -98,6 +133,14 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
             </p></template
           ></Column
         >
+        <Column header="Estado">
+          <template #body="{ data }">
+            <Tag :value="data.removed ? 'Dado de baja' : 'Activo'"
+              :severity="data.removed ? 'danger' : 'success'" />
+          </template>
+        </Column>
+        <Column header="CUIT"><template #body="{ data }">{{ data.cuil || "—" }}</template></Column>
+        <Column header="DNI"><template #body="{ data }">{{ data.dni || "—" }}</template></Column>
         <Column field="email" header="Correo" class="hidden md:table-cell" />
         <Column field="phone" header="Teléfono" class="hidden lg:table-cell" />
         <Column header="Deuda / saldo">
@@ -114,7 +157,7 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
         </Column>
         <Column header="Acciones"
           ><template #body="{ data }"
-            ><div class="flex gap-1">
+            ><div class="flex flex-wrap gap-1">
               <Button
                 as="router-link"
                 :to="`/clients/${data.id}`"
@@ -129,7 +172,9 @@ const { rows, keyword, loading, error, page, size, total, search, paginate } =
                 text
                 size="small"
                 :aria-label="`Editar cliente ${data.id}`"
-              /></div></template
+              /><Button type="button" :label="data.removed ? 'Dar de alta' : 'Dar de baja'"
+                :severity="data.removed ? 'secondary' : 'danger'" text size="small"
+                :loading="acting === data.id" :disabled="acting != null" @click="changeStatus(data)" /></div></template
         ></Column>
       </DataTable>
       </div>

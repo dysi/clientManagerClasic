@@ -30,14 +30,16 @@ public class WebClientController {
     @GetMapping
     public Page<WebClientView> list(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "ALL") String balanceState,
+            @RequestParam(defaultValue = "ACTIVE") String status,
             @RequestParam(required = false) Integer staleDays,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        if (!java.util.Arrays.asList("ALL", "DEBT", "CREDIT", "ZERO", "UNKNOWN").contains(balanceState)
+        if (!java.util.Arrays.asList("ALL", "ACTIVE", "REMOVED").contains(status)
+                || !java.util.Arrays.asList("ALL", "DEBT", "CREDIT", "ZERO", "UNKNOWN").contains(balanceState)
                 || (staleDays != null && !java.util.Arrays.asList(15, 30, 45, 60).contains(staleDays))
                 || page < 0 || size < 1 || size > 100 || keyword.length() > 150) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parámetros de búsqueda inválidos.");
         }
-        return reads.list(keyword, balanceState, staleDays, page, size);
+        return reads.list(keyword, balanceState, status, staleDays, page, size);
     }
 
     @GetMapping("/{id}")
@@ -59,6 +61,13 @@ public class WebClientController {
         Client client = find(id);
         fill(client, input);
         return dto(clients.saveAndFlush(client));
+    }
+
+    @PutMapping("/{id}/status")
+    @Transactional
+    public WebClientView status(@PathVariable long id,
+            @Valid @RequestBody com.dysi.AngryBoxClientManager.dtos.AdminInputs.ClientStatusInput input) {
+        return reads.status(id, input.removed);
     }
 
     private Client find(long id) {

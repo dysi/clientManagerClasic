@@ -9,6 +9,9 @@ import javax.validation.constraints.*;
 public final class AdminInputs {
     private AdminInputs() { }
 
+    public static class VisibilityInput { @NotNull public Boolean hidden; }
+    public static class ClientStatusInput { @NotNull public Boolean removed; }
+
     public static class LicenseInput {
         @NotNull @Positive public Long clientId;
         @NotNull @Positive public Long companyId;
