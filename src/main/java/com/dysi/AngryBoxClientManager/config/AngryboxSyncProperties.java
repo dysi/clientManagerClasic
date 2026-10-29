@@ -19,6 +19,7 @@ public class AngryboxSyncProperties {
     public enum MatchingMode { CODE, DOCUMENT, CODE_AND_DOCUMENT, CODE_OR_DOCUMENT }
 
     private boolean enabled;
+    private boolean syncDeactivations;
     private Long sourceCompanyId;
     @NotNull
     private AuthorityName requiredAuthority = AuthorityName.ROLE_API;
@@ -42,6 +43,14 @@ public class AngryboxSyncProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isSyncDeactivations() {
+        return syncDeactivations;
+    }
+
+    public void setSyncDeactivations(boolean syncDeactivations) {
+        this.syncDeactivations = syncDeactivations;
     }
 
     public Long getSourceCompanyId() {

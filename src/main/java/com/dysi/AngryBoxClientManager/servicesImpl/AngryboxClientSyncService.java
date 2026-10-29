@@ -93,7 +93,8 @@ public class AngryboxClientSyncService {
             Result row = new Result(incoming);
             response.clientesIn.add(row);
             validateAmount(row);
-            AngryboxClientMatcher.Resolution match = matcher.resolve(incoming);
+            AngryboxClientMatcher.Resolution match = matcher.resolve(incoming,
+                    settings.isSyncDeactivations() && Boolean.TRUE.equals(incoming.baja));
             row.errores.addAll(match.errors);
             related.addAll(match.relatedIds);
             if (match.target != null) {
@@ -214,7 +215,8 @@ public class AngryboxClientSyncService {
         Client client = locked.get();
         entityManager.refresh(client, LockModeType.PESSIMISTIC_WRITE);
         if (!Objects.equals(identity.dni, client.getDni()) || !Objects.equals(identity.cuil, client.getCuil())
-                || !Objects.equals(identity.externalCode, client.getExternalCode()) || client.getRemoveDate() != null) {
+                || !Objects.equals(identity.externalCode, client.getExternalCode())
+                || identity.removed != (client.getRemoveDate() != null)) {
             row.errores.add("Los identificadores del cliente cambiaron durante la sincronización. Actualizá los datos y reenviá un nuevo lote.");
             return;
         }
@@ -229,6 +231,12 @@ public class AngryboxClientSyncService {
         balance.setCurrency(com.dysi.AngryBoxClientManager.models.Currency.ARS);
         balance.setSynchronizedAt(LocalDateTime.ofInstant(dataAt, businessZone));
         balances.save(balance);
+        // La baja explícita conserva deuda, relaciones y el primer evento de auditoría.
+        // Nunca se reactiva un cliente por recibir baja=false o un campo ausente.
+        if (settings.isSyncDeactivations() && Boolean.TRUE.equals(row.baja)) {
+            client.markRemoved();
+            clients.save(client);
+        }
         row.sincronizo = true;
     }
 

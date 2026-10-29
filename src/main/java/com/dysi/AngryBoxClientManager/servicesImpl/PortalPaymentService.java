@@ -1,5 +1,6 @@
 package com.dysi.AngryBoxClientManager.servicesImpl;
 
+import com.dysi.AngryBoxClientManager.mail.PaymentMailAlert;
 import com.dysi.AngryBoxClientManager.dtos.PortalInputs;
 import com.dysi.AngryBoxClientManager.dtos.PortalViews;
 import com.dysi.AngryBoxClientManager.models.*;
@@ -29,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class PortalPaymentService {
     private static final Logger LOG = LoggerFactory.getLogger(PortalPaymentService.class);
+    private final PaymentMailAlert mailAlert;
     private final PortalAccessService access;
     private final ClientRepository clients;
     private final PaymentRepository payments;
@@ -38,7 +40,9 @@ public class PortalPaymentService {
     private final TransactionTemplate transaction;
 
     public PortalPaymentService(PortalAccessService access, ClientRepository clients, PaymentRepository payments,
-            EntityManager em, ReceiptProcessor processor, ReceiptStorage storage, PlatformTransactionManager manager) {
+            EntityManager em, ReceiptProcessor processor, ReceiptStorage storage, PlatformTransactionManager manager,
+            PaymentMailAlert mailAlert) {
+        this.mailAlert = mailAlert;
         this.access = access; this.clients = clients; this.payments = payments; this.em = em;
         this.processor = processor; this.storage = storage;
         transaction = new TransactionTemplate(manager); transaction.setTimeout(120);
@@ -109,6 +113,7 @@ public class PortalPaymentService {
         if (text(input.comment) != null) addComment(payment, text(input.comment), current, now);
         persistReceipts(payment, current, receipts, input.descriptions, null, now);
         em.flush();
+        mailAlert.afterCreation(payment, receipts.size());
         return PortalReadService.paymentView(payment, null);
     }
 

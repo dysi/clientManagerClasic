@@ -51,6 +51,7 @@ public final class AngryboxClientSync {
         public String codigoExterno;
         public BigDecimal deudaCuentaCorriente;
         public boolean sincronizo;
+        public Boolean baja;
         public Long clientManagerId;
         public String criterioCoincidencia;
         public List<String> errores = new ArrayList<>();
@@ -64,6 +65,7 @@ public final class AngryboxClientSync {
             cuitCuil = source.cuitCuil;
             codigoExterno = source.codigoExterno;
             deudaCuentaCorriente = source.deudaCuentaCorriente;
+            baja = source.baja;
         }
     }
 

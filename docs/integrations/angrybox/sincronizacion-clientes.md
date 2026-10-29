@@ -2,10 +2,11 @@
 
 ## Alcance
 
-`POST /api/clients/sync` reemplaza exclusivamente la fotografía de
+`POST /api/clients/sync` reemplaza la fotografía de
 `ClientAccountBalance` en ARS: positivo es deuda, negativo es saldo a favor. Actualiza
 `synchronizedAt` con la fecha de datos presentada en `portal.review.time-zone`.
-No crea ni edita clientes, reactiva anulados, genera pagos o modifica licencias.
+No crea clientes, cambia su identidad, reactiva anulados, genera pagos o modifica licencias.
+Opcionalmente propaga la baja lógica de Angrybox al Client vinculado.
 La baja en Angrybox no borra una deuda: esas filas también se procesan. La ausencia
 de un cliente en el envío no elimina ni pone a cero su saldo.
 
@@ -19,6 +20,7 @@ License.id. La cuenta de integración debe estar autorizada para ese padrón glo
 
 ```properties
 angrybox.sync.enabled=false
+angrybox.sync.sync-deactivations=false
 angrybox.sync.required-authority=ROLE_API
 angrybox.sync.source-company-id=
 angrybox.sync.code-target=EXTERNAL_CODE
@@ -31,6 +33,19 @@ Variables equivalentes: `CLIENTMANAGER_ANGRYBOX_SYNC_ENABLED`,
 `CLIENTMANAGER_ANGRYBOX_SYNC_MATCHING_MODE` y
 `CLIENTMANAGER_ANGRYBOX_SYNC_MAX_FUTURE_SECONDS`.
 Habilitar sin empresa positiva impide el arranque; deshabilitado devuelve 403.
+
+`sync-deactivations` (variable `CLIENTMANAGER_ANGRYBOX_SYNC_DEACTIVATIONS`) está
+desactivada por defecto, incluso si falta la propiedad. Con `true`, una fila con
+`baja=true` y coincidencia válida actualiza la deuda y da de baja lógicamente al
+Client en la misma transacción. Conserva fecha/actor de la primera baja si ya estaba
+dado de baja y permite actualizar su deuda en posteriores envíos con `baja=true`.
+Los errores de identidad, duplicados o saldo impiden tanto la baja como la actualización
+de esa fila. No modifica usuarios, licencias ni pagos. `baja=false`, null o ausente
+no reactiva al Client; un Client anulado con esos valores continúa devolviendo error.
+Con la opción desactivada, se conserva el comportamiento anterior: no propaga bajas
+y rechaza actualizar clientes anulados en ClientManager. Los reenvíos con igual UUID
+recuperan el resultado original, incluso si luego cambia la configuración; para
+aplicar la opción se debe generar una nueva sincronización con fotografía posterior.
 
 | code-target | Comparación de codigoExterno enviado por Angrybox |
 | --- | --- |
@@ -50,7 +65,8 @@ interpreta como ID remoto.
 En modos simples se usa solo el criterio configurado. Para contrastar los dos,
 elegir CODE_AND_DOCUMENT. No se elige el primer duplicado ni se ignoran contradicciones
 en el modo alternativo. Los clientes anulados también sirven como candidatos para
-diagnosticar conflictos, pero nunca reciben una actualización de saldo.
+diagnosticar conflictos. Solo reciben una actualización de saldo si
+`sync-deactivations=true` y la fila trae `baja=true`.
 
 ## Interpretación de DNI/CUIT
 

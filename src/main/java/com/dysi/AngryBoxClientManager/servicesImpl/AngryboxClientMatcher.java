@@ -48,6 +48,10 @@ public final class AngryboxClientMatcher {
     }
 
     public Resolution resolve(IncomingClient input) {
+        return resolve(input, false);
+    }
+
+    public Resolution resolve(IncomingClient input, boolean allowRemoved) {
         Resolution result = new Resolution();
         String rawCode = text(input.codigoExterno);
         String code = normalizedCode(rawCode);
@@ -106,7 +110,7 @@ public final class AngryboxClientMatcher {
                 resolveAlternative(result, byCode, byDocument);
             }
         }
-        if (result.target != null && result.target.removed) {
+        if (result.target != null && result.target.removed && !allowRemoved) {
             result.errors.add("El cliente identificado está anulado en ClientManager. Revisá su estado allí; "
                     + "la sincronización no lo reactiva ni actualiza su saldo.");
         }
