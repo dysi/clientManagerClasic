@@ -32,8 +32,10 @@ public class PaymentReviewService {
     private final LicenseRepository licenses;
     private final ClientRepository clients;
     private final ZoneId businessZone;
+    private final LicenseExtensionService extensions;
     public PaymentReviewService(EntityManager em, PaymentRepository payments, LicenseRepository licenses,
-            ClientRepository clients, @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String timeZone) {
+            ClientRepository clients, @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String timeZone, LicenseExtensionService extensions) {
+        this.extensions = extensions;
         this.em = em; this.payments = payments; this.licenses = licenses; this.clients = clients;
         this.businessZone = ZoneId.of(timeZone);
     }
@@ -112,6 +114,11 @@ public class PaymentReviewService {
             bad("Confirmá expresamente cada reducción del vencimiento.");
         LocalDateTime now = now();
         payment.decide(PaymentStatus.APROBADO);
+        extensions.approve(payment);
+        // La aprobación y su entrega pendiente se confirman en la misma transacción.
+        AngryboxPaymentDelivery delivery = new AngryboxPaymentDelivery();
+        delivery.setPayment(payment);
+        em.persist(delivery);
         for (Change change : plan.changes) apply(payment, change, actor, now);
         history(payment, PaymentStatus.APROBADO, null, actor, now); em.flush(); return detailView(payment);
     }
@@ -119,6 +126,7 @@ public class PaymentReviewService {
     public PaymentReviewViews.Detail reject(Long id, PaymentReviewInputs.Rejection input) {
         User actor = actor(); Payment payment = lockPayment(id); pending(payment, input.version);
         payment.decide(PaymentStatus.RECHAZADO);
+        extensions.reject(payment);
         history(payment, PaymentStatus.RECHAZADO, input.reason.trim(), actor, now()); em.flush(); return detailView(payment);
     }
 

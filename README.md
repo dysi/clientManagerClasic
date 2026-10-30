@@ -5,6 +5,11 @@ La recepción de clientes y deudas desde Angrybox está implementada en
 Bearer con el authority configurado (ROLE_API por defecto). Ver [contrato, reglas de vinculación y despliegue](docs/integrations/angrybox/sincronizacion-clientes.md).
 La opción `angrybox.sync.sync-deactivations` permite propagar las bajas lógicas de
 Angrybox junto con la deuda; por defecto está desactivada y nunca reactiva clientes.
+La entrega de pagos aprobados utiliza una cola transaccional y confirmación individual
+por `/api/payments/sync`. Ver [contrato y despliegue](docs/integrations/angrybox/sincronizacion-pagos.md).
+En `/ui/#/payments`, los pagos con recepción confirmada por Angrybox muestran un badge
+verde «Sincronizado» con un rayo. Su título informa la fecha y hora de confirmación en
+`portal.review.time-zone` (por defecto `America/Argentina/Buenos_Aires`).
 
 Monolito web para administrar clientes, cuentas, licencias de empresas y pagos asociados a AngryBox. Backend en **Java 11 / Spring Boot 2.7.18** y frontend en **Vue 3 / TypeScript / PrimeVue 4 / Tailwind CSS 4**, distribuido en un único **JAR ejecutable** con Tomcat embebido.
 
@@ -451,3 +456,15 @@ Verificación de correos: `clean verify` correcto con Java 11; después del ajus
 El perfil `dev` selecciona `classpath:mail-dev.properties`, con los valores SMTP del ejemplo: envío habilitado, servidor `mail.dysi.com.ar:587`, usuario/contraseña de ejemplo `test` / `you-password`, debug activo, sin SSL ni STARTTLS e intervalo de 90 segundos. Definir `CLIENTMANAGER_MAIL_USERNAME` y `CLIENTMANAGER_MAIL_PASSWORD` para usar credenciales reales sin versionarlas. `mail.to-test=info@dysi.com.ar` reemplaza los destinatarios de ejemplo de la alerta; los enlaces apuntan a `http://localhost:3000/clientmanager`. Conserva la plantilla completa y las variables documentadas. Iniciar con `--spring.profiles.active=dev`; se puede reemplazar el archivo mediante `--clientmanager.mail.config=file:C:/config/clientmanager-mail-dev.properties`. El perfil dev requiere revisar las opciones SMTP del proveedor y reiniciar después de cambios.
 
 Los archivos de correo incluidos usan comentarios ASCII y escapes Unicode estándar de `.properties` en los valores (por ejemplo `\u00f3` para ó). Esto evita mojibake en editores que interpretan `.properties` como ISO-8859-1. La lectura explícita UTF-8 se conserva y los escapes se resuelven al cargar: los correos mantienen sus acentos y Ñ. Los archivos externos también pueden usar UTF-8 directamente.
+
+### Certificados de extensión de licencias
+
+Cada presentación nueva del portal puede generar un certificado por cliente, en la misma transacción del pago. `portal.license-extension.hours` (`CLIENTMANAGER_LICENSE_EXTENSION_HOURS`, por defecto 72, rango 1–87600) determina la duración exacta desde la creación del pago. Los cambios de configuración no alteran certificados existentes. No se genera retrospectivamente para pagos históricos ni para reenvíos idempotentes.
+
+Un certificado activo cubre todas las licencias existentes, no eliminadas, sin bloqueo forzado y con vencimiento conocido ya alcanzado. Solo cambia el vencimiento enviado en `/api/clients/license`; no modifica licencias, saldos ni la estructura JSON. En este endpoint legado, `licenseStatuses[].lockDate` se devuelve como milisegundos numéricos, según el contrato consumido por AngryBox, independientemente del formato ISO de Jackson para otras respuestas. Una licencia vigente conserva su respuesta habitual. El certificado deja de ser válido exactamente al alcanzar su fecha/hora final.
+
+No se acumulan certificados activos. Uno vencido normalmente permite otro con una nueva presentación. Rechazar su pago de origen lo anula, incluso si ya venció. Si el último certificado está anulado, las nuevas presentaciones no generan otro hasta que se aprueba un pago presentado posteriormente al que lo originó. Esa aprobación registra la recuperación para futuras presentaciones, sin reactivar el certificado ni generar otro automáticamente. Aprobar el pago de origen conserva el certificado; el auditor sigue ajustando explícitamente los vencimientos que correspondan.
+
+Las presentaciones y decisiones se serializan mediante el bloqueo del cliente. Los certificados conservan auditoría y el pago que recuperó el beneficio. Aplicar manualmente `src/main/resources/db/20261030-02-certificados-extension-licencias.sql` antes de desplegar; validar primero sobre una copia MySQL compatible. No hay ejecutor automático de migraciones.
+
+Limitación de compatibilidad: AngryBox convierte el vencimiento recibido a una fecha sin hora y lo conserva localmente. ClientManager verifica las horas exactas en cada consulta, pero no puede revocar una respuesta ya guardada ni garantizar el corte horario local sin cambios en AngryBox. La anulación se refleja en la siguiente consulta. No se incorporó una pantalla ni un PDF del certificado.

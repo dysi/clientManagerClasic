@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 /** Respuestas del lote sin cuerpos de clientes, credenciales ni detalles de infraestructura. */
-@RestControllerAdvice(assignableTypes = AngryboxClientSyncController.class)
+@RestControllerAdvice(assignableTypes = {AngryboxClientSyncController.class, AngryboxPaymentSyncController.class})
 public class AngryboxSyncErrorHandler {
     private static final Logger logger = LoggerFactory.getLogger(AngryboxSyncErrorHandler.class);
 
@@ -30,7 +30,7 @@ public class AngryboxSyncErrorHandler {
             org.springframework.web.bind.MissingServletRequestParameterException.class})
     public ResponseEntity<?> invalid(Exception error) {
         return ResponseEntity.badRequest().body(Map.of("message",
-                "Revisá el contrato v1: UUID válido, empresa positiva, fecha con zona horaria y lista de clientes obligatorios. No se procesó el lote."));
+                "La solicitud de integración no es válida. Revisá los parámetros y campos obligatorios del contrato v1."));
     }
 
     @ExceptionHandler({org.springframework.dao.DataIntegrityViolationException.class,

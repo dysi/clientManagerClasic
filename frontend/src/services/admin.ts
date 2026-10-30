@@ -43,6 +43,7 @@ export interface Payment {
   amount: number;
   currency: "ARS";
   issuedAt: string;
+  angryboxSynchronizedAt?: string | null;
   status: "PENDIENTE" | "APROBADO" | "RECHAZADO";
 }
 export interface User {

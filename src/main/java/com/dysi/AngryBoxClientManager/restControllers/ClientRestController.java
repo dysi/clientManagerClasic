@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClientRestController {
 
     @Autowired
-    private com.fasterxml.jackson.databind.ObjectMapper mapper;
+    private com.dysi.AngryBoxClientManager.servicesImpl.LicenseExtensionService extensions;
     @Autowired
     private ClientService clientService;
     @Autowired
@@ -53,12 +53,7 @@ public class ClientRestController {
                 return new ResponseEntity<License>(license, HttpStatus.NOT_FOUND);
             }
 
-            // AngryBox construye su String desde forcedLock. Solo se modifica la respuesta.
-            com.fasterxml.jackson.databind.node.ObjectNode response = mapper.valueToTree(license);
-            if (client.getRemoveDate() != null) {
-                response.path("licenseStatuses").forEach(state ->
-                        ((com.fasterxml.jackson.databind.node.ObjectNode) state).put("forcedLock", true));
-            }
+            com.fasterxml.jackson.databind.node.ObjectNode response = extensions.licenseResponse(client, license);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return new ResponseEntity<License>(HttpStatus.INTERNAL_SERVER_ERROR);

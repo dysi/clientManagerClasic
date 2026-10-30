@@ -32,6 +32,7 @@ public final class AdminViews {
         public String clientName, companyName, currency, status;
         public BigDecimal amount;
         public java.time.LocalDateTime issuedAt;
+        public java.time.LocalDateTime angryboxSynchronizedAt;
     }
 
     public static class UserView {

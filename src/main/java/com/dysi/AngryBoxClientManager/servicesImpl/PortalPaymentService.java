@@ -31,6 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class PortalPaymentService {
     private static final Logger LOG = LoggerFactory.getLogger(PortalPaymentService.class);
     private final PaymentMailAlert mailAlert;
+    private final LicenseExtensionService extensions;
     private final PortalAccessService access;
     private final ClientRepository clients;
     private final PaymentRepository payments;
@@ -41,7 +42,8 @@ public class PortalPaymentService {
 
     public PortalPaymentService(PortalAccessService access, ClientRepository clients, PaymentRepository payments,
             EntityManager em, ReceiptProcessor processor, ReceiptStorage storage, PlatformTransactionManager manager,
-            PaymentMailAlert mailAlert) {
+            PaymentMailAlert mailAlert, LicenseExtensionService extensions) {
+        this.extensions = extensions;
         this.mailAlert = mailAlert;
         this.access = access; this.clients = clients; this.payments = payments; this.em = em;
         this.processor = processor; this.storage = storage;
@@ -107,6 +109,7 @@ public class PortalPaymentService {
         payment.setOrigin(current.getOrigin()); payment.setSubmittedBy(actor);
         payment.setWithoutReceipt(input.withoutReceipt); payment.setNoReceiptReason(text(input.noReceiptReason));
         payment.setSubmissionKey(input.submissionKey); em.persist(payment);
+        extensions.issue(payment);
         PaymentStatusHistory event = new PaymentStatusHistory(); event.setPayment(payment);
         event.setNewStatus(PaymentStatus.PENDIENTE); event.setOccurredAt(now);
         event.setResponsibleUser(actor); event.setOrigin(current.getOrigin()); em.persist(event);

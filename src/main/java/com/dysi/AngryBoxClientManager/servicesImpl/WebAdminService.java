@@ -20,6 +20,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Transactional(readOnly = true)
 public class WebAdminService {
+    @javax.persistence.PersistenceContext
+    private javax.persistence.EntityManager entityManager;
+    @org.springframework.beans.factory.annotation.Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}")
+    private String reviewTimeZone;
+
     private final ClientRepository clients;
     private final LicenseRepository licenses;
     private final PaymentRepository payments;
@@ -128,7 +133,19 @@ public class WebAdminService {
         Set<PaymentStatus> selected = paymentStatuses(status);
         Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, from, to);
         if (!selected.isEmpty()) specification = specification.and((root, query, cb) -> root.get("status").in(selected));
-        return payments.findAll(specification, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "issuedAt", "id"))).map(WebAdminService::paymentView);
+        Page<PaymentView> result = payments.findAll(specification,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "issuedAt", "id"))).map(WebAdminService::paymentView);
+        if (!result.isEmpty()) {
+            List<Long> ids = result.stream().map(view -> view.id).collect(Collectors.toList());
+            // Consultar solo la página evita una consulta adicional por cada pago.
+            Map<Long, LocalDateTime> synchronizedAt = new HashMap<>();
+            entityManager.createQuery("select d from AngryboxPaymentDelivery d where d.paymentId in :ids "
+                    + "and d.deliveredAt is not null", AngryboxPaymentDelivery.class)
+                    .setParameter("ids", ids).getResultList().forEach(delivery -> synchronizedAt.put(
+                            delivery.getPaymentId(), LocalDateTime.ofInstant(delivery.getDeliveredAt(), ZoneId.of(reviewTimeZone))));
+            result.forEach(view -> view.angryboxSynchronizedAt = synchronizedAt.get(view.id));
+        }
+        return result;
     }
 
     /** Los contadores conservan los filtros de contexto, sin restringirse a los estados seleccionados. */

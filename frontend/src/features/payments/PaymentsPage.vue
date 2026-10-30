@@ -99,6 +99,7 @@ async function navigate(next = 0, count = size.value) {
       <Column header="Importe"><template #body="{ data }">{{ money(data.amount) }}</template></Column>
       <Column header="Emisión"><template #body="{ data }">{{ displayDateTime(data.issuedAt) }}</template></Column>
       <Column header="Estado"><template #body="{ data }: { data: Payment }"><Tag :value="paymentLabels[data.status]" :severity="data.status === 'APROBADO' ? 'success' : data.status === 'RECHAZADO' ? 'danger' : 'warn'" /></template></Column>
+      <Column header="Sincronización"><template #body="{ data }: { data: Payment }"><Tag v-if="data.angryboxSynchronizedAt" value="Sincronizado" severity="success" icon="pi pi-bolt" :title="`sincronizado: ${displayDateTime(data.angryboxSynchronizedAt)}`" /></template></Column>
       <Column header="Detalle"><template #body="{ data }"><Button as="router-link" :to="{ path: '/payments/' + data.id, query: { returnTo: route.fullPath } }" label="Revisar pago" icon="pi pi-eye" text size="small" /></template></Column>
     </DataTable>
     <ListPaginator :page="page" :size="size" :total="total" @change="navigate" />

@@ -149,6 +149,12 @@ public class AngryboxClientSyncService {
         return response;
     }
 
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority(@angryboxSyncProperties.requiredAuthority.name())")
+    public void authorizeIntegration(String username, Long companyId) {
+        authorize(username, companyId);
+    }
+
     private void authorize(String username, Long companyId) {
         if (!settings.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "La recepción de clientes desde Angrybox está desactivada.");
