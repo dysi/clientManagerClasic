@@ -248,6 +248,8 @@ async function changeVisibility(license: License) {
                 icon="pi pi-wallet"
                 text
                 size="small"
+              /><Button as="router-link" :to="{ path: '/license-query-log', query: { companyId: data.companyId } }"
+                label="Bitácora" icon="pi pi-history" text size="small"
               /><Button
                 :label="data.locked ? 'Desbloquear' : 'Bloquear'"
                 :severity="data.locked ? 'secondary' : 'danger'"

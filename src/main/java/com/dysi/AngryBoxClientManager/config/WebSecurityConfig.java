@@ -33,6 +33,9 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     @Autowired
     private UserDetailsService userDetailsService;
 
+    @Autowired
+    private com.dysi.AngryBoxClientManager.security.LicenseQueryLogFilter licenseQueryLogFilter;
+
     @Override
     protected void configure(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
         authenticationManagerBuilder
@@ -85,6 +88,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         // Custom JWT based security filter
         httpSecurity
                 .addFilterBefore(authenticationTokenFilterBean(), UsernamePasswordAuthenticationFilter.class);
+        httpSecurity.addFilterBefore(licenseQueryLogFilter, JwtAuthenticationTokenFilter.class);
 
         // disable page caching
         httpSecurity.headers().cacheControl();

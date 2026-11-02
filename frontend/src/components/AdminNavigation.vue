@@ -8,6 +8,7 @@ const navigation = [
   { label: "Licencias", icon: "pi pi-key", route: "/licenses" },
   { label: "Pagos", icon: "pi pi-wallet", route: "/payments" },
   { label: "Usuarios", icon: "pi pi-users", route: "/users" },
+  { label: "Bitácora de seguimiento", icon: "pi pi-history", route: "/license-query-log" },
   { label: "Parámetros", icon: "pi pi-cog", route: "/parameters" },
 ];
 </script>

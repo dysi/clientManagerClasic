@@ -19,10 +19,13 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
     private final org.springframework.security.core.userdetails.UserDetailsService users;
     private final PortalAccessService portal;
+    private final com.dysi.AngryBoxClientManager.security.LicenseQueryLogFilter licenseQueryLogFilter;
     public WebSessionSecurityConfig(org.springframework.security.core.userdetails.UserDetailsService users,
-            PortalAccessService portal) {
+            PortalAccessService portal,
+            com.dysi.AngryBoxClientManager.security.LicenseQueryLogFilter licenseQueryLogFilter) {
         this.users = users;
         this.portal = portal;
+        this.licenseQueryLogFilter = licenseQueryLogFilter;
     }
 
     @Override
@@ -77,6 +80,8 @@ public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
                 });
         // Default session-backed CSRF repository is deliberately enabled.
         http.addFilterAfter(new WebSessionUserFilter(users, portal),
+                org.springframework.security.web.context.SecurityContextPersistenceFilter.class);
+        http.addFilterAfter(licenseQueryLogFilter,
                 org.springframework.security.web.context.SecurityContextPersistenceFilter.class);
         http.headers().addHeaderWriter((request, response) -> {
             if (request.getRequestURI().substring(request.getContextPath().length()).startsWith("/ui")) {

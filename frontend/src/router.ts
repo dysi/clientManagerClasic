@@ -46,6 +46,10 @@ export const router = createRouter({
       component: () => import("./features/licenses/LicensesPage.vue"),
     },
     {
+      path: "/license-query-log",
+      component: () => import("./features/licenses/LicenseQueryLogPage.vue"),
+    },
+    {
       path: "/licenses/new",
       component: () => import("./features/licenses/LicenseFormPage.vue"),
     },

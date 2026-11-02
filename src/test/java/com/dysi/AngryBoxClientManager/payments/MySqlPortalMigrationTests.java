@@ -40,6 +40,9 @@ class MySqlPortalMigrationTests {
             assertEquals(2, count(connection, "client")); assertEquals(1, count(connection, "user"));
             assertEquals(1, count(connection, "license")); assertEquals(1, count(connection, "licensestatus"));
             script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-03-modelo-portal-pagos.sql");
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#20261030-03-correccion-pagos-pendientes.sql");
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#20261031-01-correccion-destino-bancario-pagos.sql");
+            script(connection, "/db/20261102-04-validaciones-portal-mysql57.sql");
             assertEquals(0, count(connection, "client_account_balance"));
             execute(connection, "INSERT INTO bank(id,name,normalized_name,active) VALUES (100,'Prueba','prueba',1)");
             execute(connection, "INSERT INTO bank_account(id,bank_id,holder,cbu,active) VALUES (101,100,'Titular','0000000000000000000000',1)");
@@ -65,7 +68,7 @@ class MySqlPortalMigrationTests {
         settings.put("hibernate.connection.driver_class", "com.mysql.cj.jdbc.Driver");
         settings.put("hibernate.connection.url", SERVER + SCHEMA + OPTIONS);
         settings.put("hibernate.connection.username", "root"); settings.put("hibernate.connection.password", password);
-        settings.put("hibernate.dialect", "org.hibernate.dialect.MySQL8Dialect");
+        settings.put("hibernate.dialect", "org.hibernate.dialect.MySQL57Dialect");
         settings.put("hibernate.physical_naming_strategy", "org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy");
         var registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
         try {

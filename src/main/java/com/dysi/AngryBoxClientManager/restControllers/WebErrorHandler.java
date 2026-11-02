@@ -10,10 +10,10 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
-@RestControllerAdvice(assignableTypes = { WebSessionController.class, WebClientController.class, WebAdminController.class, WebParameterController.class, WebPortalController.class, WebReceiptController.class, WebPaymentReviewController.class })
+@RestControllerAdvice(assignableTypes = { WebSessionController.class, WebClientController.class, WebAdminController.class, WebParameterController.class, WebPortalController.class, WebReceiptController.class, WebPaymentReviewController.class, WebLicenseQueryController.class, LicenseV2Controller.class })
 public class WebErrorHandler {
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> validation(MethodArgumentNotValidException error) {
+    @ExceptionHandler({MethodArgumentNotValidException.class, org.springframework.validation.BindException.class})
+    public ResponseEntity<?> validation(org.springframework.validation.BindException error) {
         Map<String, String> fields = new LinkedHashMap<>();
         error.getBindingResult().getFieldErrors().forEach(field -> fields.putIfAbsent(field.getField(), field.getDefaultMessage()));
         return ResponseEntity.badRequest().body(Map.of("message", "Revisá los campos indicados.", "fields", fields));

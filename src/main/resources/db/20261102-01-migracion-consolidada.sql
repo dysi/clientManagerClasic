@@ -3,7 +3,7 @@
 -- migraciones aplicadas ni columnas creadas por ddl-auto=update.
 -- Si la base ya esta parcial o totalmente migrada, NO ejecutar el archivo completo:
 -- revisar esquema y registro de ejecucion para determinar los cambios pendientes.
--- Precondiciones: MySQL 8.0.16+, InnoDB, IDs BIGINT con signo, nombres fisicos
+-- Precondiciones: MySQL 5.7.24, InnoDB, IDs BIGINT con signo, nombres fisicos
 -- minusculos, esquema seleccionado, aplicacion detenida y backup recuperable.
 -- Probar primero sobre una copia compatible de MySQL.
 -- ATENCION: la seccion 02 elimina TODOS los pagos del modelo anterior.
@@ -13,6 +13,66 @@
 -- Al finalizar revisar resultados y arrancar con ddl-auto=validate.
 -- No se ejecuta automaticamente al iniciar Spring Boot.
 -- Los nombres originales citados son referencias a secciones de este mismo archivo.
+
+-- Consolidado para MySQL 5.7.24: ejecutar SOLO en bases originales sin migrar.
+-- Sustituye la revision anterior para MySQL 8; no repetir sobre una copia ya migrada.
+-- Para la copia ya migrada, revisar el esquema y usar únicamente el archivo 04.
+-- Los CHECK se sustituyen por diez triggers al final; mantener la aplicación detenida
+-- hasta terminar todo el archivo. Requiere permisos TRIGGER además de DDL/rutinas.
+SELECT DATABASE() AS esquema_destino, VERSION() AS version_motor;
+DELIMITER $$
+CREATE PROCEDURE cm_preflight_mysql57()
+BEGIN
+    DECLARE legacy_fk_count INT;
+    IF DATABASE() IS NULL OR VERSION() NOT LIKE '5.7.%' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Esta variante requiere esquema seleccionado y MySQL 5.7';
+    END IF;
+    IF @@innodb_large_prefix = 0 OR @@innodb_file_per_table = 0 OR @@innodb_file_format <> 'Barracuda' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Requiere InnoDB large_prefix, file_per_table y formato Barracuda para indices utf8mb4';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+        AND ((table_name IN ('user','client','license') AND column_name='creationdate')
+        OR (table_name='payment' AND column_name IN ('client_id','modificationdate')))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Base parcial o totalmente migrada: NO repetir consolidado ni vaciado';
+    END IF;
+    IF (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+        AND table_name IN ('user','client','license','payment','licensestatus') AND engine='InnoDB') <> 5 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Se requieren cinco tablas originales InnoDB';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+        AND table_name IN ('bank','bank_account','client_account_balance','payment_status_history',
+        'comment','attachment','payment_comment','payment_attachment','payment_license_action',
+        'angrybox_sync_state','angrybox_sync_batch','angrybox_payment_delivery','license_extension_certificate')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Existen tablas nuevas: revisar migracion previa antes de cualquier borrado';
+    END IF;
+    SELECT COUNT(*) INTO legacy_fk_count
+    FROM information_schema.key_column_usage
+    WHERE table_schema = DATABASE() AND table_name = 'payment'
+        AND column_name = 'license_id' AND referenced_table_schema = DATABASE()
+        AND referenced_table_name = 'license' AND referenced_column_name = 'id'
+        AND constraint_name IN (SELECT constraint_name FROM information_schema.key_column_usage
+            WHERE table_schema = DATABASE() AND table_name = 'payment'
+            GROUP BY constraint_name HAVING COUNT(*) = 1);
+    IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+        AND table_name='payment' AND column_name IN
+        ('license_id','amount','discount','paymentdate','paymentrealdate','expirationdate','observation')) <> 7 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'payment no tiene las siete columnas del modelo antiguo: revisar esquema';
+    END IF;
+    -- Algunas bases historicas conservan el indice pero no la FK. Se admite su ausencia;
+    -- una FK compuesta, duplicada o hacia otro destino sigue siendo incompatible.
+    IF legacy_fk_count > 1 OR (SELECT COUNT(*) FROM information_schema.key_column_usage
+        WHERE table_schema=DATABASE() AND table_name='payment' AND column_name='license_id'
+        AND referenced_table_name IS NOT NULL) <> legacy_fk_count THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'FK de payment.license_id incompatible: solo se admite una simple a license.id o ninguna';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.key_column_usage
+        WHERE referenced_table_schema=DATABASE() AND referenced_table_name='payment') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Hay dependencias de payment: revisar antes de cualquier cambio';
+    END IF;
+END$$
+DELIMITER ;
+CALL cm_preflight_mysql57();
+DROP PROCEDURE cm_preflight_mysql57;
 
 -- BEGIN 20261026-01-auditoria-entidades.sql
 -- Seccion 01 de 11
@@ -112,7 +172,7 @@ ORDER BY table_name, constraint_name;
 -- Seccion 02 de 11
 -- OPERACION DESTRUCTIVA AUTORIZADA: descarta TODOS los pagos del modelo anterior.
 -- Ejecutar manualmente con aplicacion detenida, backup comprobado y esquema seleccionado.
--- Precondicion: MySQL 8.0.16+, InnoDB, migracion 20261026-01 aplicada.
+-- Precondicion: MySQL 5.7.24, InnoDB, migracion 20261026-01 aplicada.
 -- El esquema versionado no tiene tablas dependientes de payment. No existen comprobantes
 -- ni comentarios antiguos. Si aparecen FKs entrantes, ABORTAR y revisar esas dependencias:
 -- no se eliminan registros ajenos ni se deshabilitan claves foraneas.
@@ -153,7 +213,7 @@ COMMIT;
 -- BEGIN 20261026-03-modelo-portal-pagos.sql
 -- Seccion 03 de 11
 -- Estructura del portal: ejecutar una vez DESPUES del vaciado 20261026-02.
--- Precondiciones: MySQL 8.0.16+ (CHECK efectivos), InnoDB, nombres fisicos minusculos,
+-- Precondiciones: MySQL 5.7.24 (validaciones mediante triggers al final), InnoDB, nombres fisicos minusculos,
 -- IDs BIGINT con signo y auditoria 20261026-01 aplicada.
 -- Tablas nuevas: AUTO_INCREMENT, coherente con AUTO y los mapeos heredados configurados.
 -- Ejecutar solo sobre el esquema previo a esta migracion; no repetir en bases ya migradas.
@@ -174,21 +234,36 @@ BEGIN
     SELECT COUNT(*), MAX(constraint_name) INTO legacy_license_fk_columns, legacy_license_fk
     FROM information_schema.key_column_usage
     WHERE table_schema = DATABASE() AND table_name = 'payment'
-        AND column_name = 'license_id' AND referenced_table_name = 'license' AND referenced_column_name = 'id';
-    IF legacy_license_fk_columns <> 1 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Se esperaba una FK payment.license_id a license.id: revisar esquema';
+        AND column_name = 'license_id' AND referenced_table_schema = DATABASE()
+        AND referenced_table_name = 'license' AND referenced_column_name = 'id'
+        AND constraint_name IN (SELECT constraint_name FROM information_schema.key_column_usage
+            WHERE table_schema = DATABASE() AND table_name = 'payment'
+            GROUP BY constraint_name HAVING COUNT(*) = 1);
+    IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+        AND table_name='payment' AND column_name IN
+        ('license_id','amount','discount','paymentdate','paymentrealdate','expirationdate','observation')) <> 7
+        OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+            AND table_name='payment' AND column_name='client_id') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'payment no corresponde al modelo antiguo: no repetir migracion';
     END IF;
-    -- Reemplaza el nombre generado por Hibernate, sin asumirlo ni conservar un posible CASCADE.
-    SET @cm_drop_legacy_fk = CONCAT('ALTER TABLE payment DROP FOREIGN KEY `', REPLACE(legacy_license_fk, '`', '``'), '`');
-    PREPARE cm_drop_fk_statement FROM @cm_drop_legacy_fk;
-    EXECUTE cm_drop_fk_statement;
-    DEALLOCATE PREPARE cm_drop_fk_statement;
+    IF legacy_license_fk_columns > 1 OR (SELECT COUNT(*) FROM information_schema.key_column_usage
+        WHERE table_schema=DATABASE() AND table_name='payment' AND column_name='license_id'
+        AND referenced_table_name IS NOT NULL) <> legacy_license_fk_columns THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'FK de payment.license_id incompatible: solo se admite una simple a license.id o ninguna';
+    END IF;
+    -- Si existe, reemplaza la FK sin asumir el nombre ni conservar un posible CASCADE.
+    -- Si falta, la FK compuesta se crea igualmente en el ALTER posterior, con payment vacia.
+    IF legacy_license_fk_columns = 1 THEN
+        SET @cm_drop_legacy_fk = CONCAT('ALTER TABLE payment DROP FOREIGN KEY `', REPLACE(legacy_license_fk, '`', '``'), '`');
+        PREPARE cm_drop_fk_statement FROM @cm_drop_legacy_fk;
+        EXECUTE cm_drop_fk_statement;
+        DEALLOCATE PREPARE cm_drop_fk_statement;
+    END IF;
 END$$
 DELIMITER ;
 CALL cm_require_empty_payment();
 DROP PROCEDURE cm_require_empty_payment;
-ALTER TABLE client ADD COLUMN dni VARCHAR(8) NULL,
-    ADD CONSTRAINT ck_client_dni CHECK (dni IS NULL OR dni REGEXP '^[0-9]{1,8}$');
+ALTER TABLE client ADD COLUMN dni VARCHAR(8) NULL;
 -- Permite reforzar la pertenencia del cliente tambien con FK compuesta.
 ALTER TABLE license ADD CONSTRAINT uk_license_client UNIQUE (id, client_id);
 
@@ -207,7 +282,7 @@ CREATE TABLE `bank` (
     CONSTRAINT fk_bank_modified FOREIGN KEY (modified_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_bank_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT uk_bank_name UNIQUE (normalized_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `bank_account` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -227,9 +302,8 @@ CREATE TABLE `bank_account` (
     CONSTRAINT fk_bank_account_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_bank_account_bank_id FOREIGN KEY (bank_id) REFERENCES `bank`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT uk_bank_account_cbu UNIQUE (cbu),
-    CONSTRAINT uk_bank_account_alias UNIQUE (alias),
-    CONSTRAINT ck_account_cbu CHECK (cbu REGEXP '^[0-9]{22}$')
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    CONSTRAINT uk_bank_account_alias UNIQUE (alias)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `client_account_balance` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -247,9 +321,8 @@ CREATE TABLE `client_account_balance` (
     CONSTRAINT fk_client_account_balance_modified FOREIGN KEY (modified_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_client_account_balance_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_client_account_balance_client_id FOREIGN KEY (client_id) REFERENCES `client`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT uk_client_account_balance_client_id UNIQUE (client_id),
-    CONSTRAINT ck_balance_currency CHECK (currency = 'ARS')
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    CONSTRAINT uk_client_account_balance_client_id UNIQUE (client_id)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE payment
     DROP COLUMN discount,
@@ -280,12 +353,7 @@ ALTER TABLE payment
     ADD CONSTRAINT fk_payment_bank_account_id FOREIGN KEY (bank_account_id) REFERENCES `bank_account`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     ADD CONSTRAINT fk_payment_submitted_by_id FOREIGN KEY (submitted_by_id) REFERENCES `user`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     ADD CONSTRAINT uk_payment_submission UNIQUE (client_id, submission_key),
-    ADD CONSTRAINT fk_payment_license_client FOREIGN KEY (license_id, client_id) REFERENCES license(id, client_id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    ADD CONSTRAINT ck_payment_amount CHECK (amount > 0),
-    ADD CONSTRAINT ck_payment_currency CHECK (currency = 'ARS'),
-    ADD CONSTRAINT ck_payment_method CHECK (method = 'TRANSFERENCIA'),
-    ADD CONSTRAINT ck_payment_status CHECK (status IN ('PENDIENTE', 'APROBADO', 'RECHAZADO')),
-    ADD CONSTRAINT ck_payment_receipt_reason CHECK ((without_receipt = 1 AND no_receipt_reason IS NOT NULL AND CHAR_LENGTH(TRIM(no_receipt_reason)) > 0) OR (without_receipt = 0 AND (no_receipt_reason IS NULL OR CHAR_LENGTH(TRIM(no_receipt_reason)) = 0)));
+    ADD CONSTRAINT fk_payment_license_client FOREIGN KEY (license_id, client_id) REFERENCES license(id, client_id) ON DELETE RESTRICT ON UPDATE RESTRICT;
 
 CREATE TABLE `payment_status_history` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -307,10 +375,8 @@ CREATE TABLE `payment_status_history` (
     CONSTRAINT fk_payment_status_history_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_payment_status_history_payment_id FOREIGN KEY (payment_id) REFERENCES `payment`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_payment_status_history_responsible_user_id FOREIGN KEY (responsible_user_id) REFERENCES `user`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT uk_payment_history_state UNIQUE (payment_id, new_status),
-    CONSTRAINT ck_history_transition CHECK ((previous_status IS NULL AND new_status = 'PENDIENTE') OR (previous_status IS NOT NULL AND previous_status = 'PENDIENTE' AND new_status IN ('APROBADO','RECHAZADO'))),
-    CONSTRAINT ck_history_rejection CHECK (new_status <> 'RECHAZADO' OR (reason IS NOT NULL AND CHAR_LENGTH(TRIM(reason)) > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    CONSTRAINT uk_payment_history_state UNIQUE (payment_id, new_status)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `comment` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -329,7 +395,7 @@ CREATE TABLE `comment` (
     CONSTRAINT fk_comment_modified FOREIGN KEY (modified_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_comment_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_comment_author_id FOREIGN KEY (author_id) REFERENCES `user`(id) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `attachment` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -354,7 +420,7 @@ CREATE TABLE `attachment` (
     CONSTRAINT fk_attachment_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_attachment_uploaded_by_id FOREIGN KEY (uploaded_by_id) REFERENCES `user`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT uk_attachment_storage UNIQUE (storage_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `payment_comment` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -372,7 +438,7 @@ CREATE TABLE `payment_comment` (
     CONSTRAINT fk_payment_comment_payment_id FOREIGN KEY (payment_id) REFERENCES `payment`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_payment_comment_comment_id FOREIGN KEY (comment_id) REFERENCES `comment`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT uk_payment_comment_comment_id UNIQUE (comment_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `payment_attachment` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -390,7 +456,7 @@ CREATE TABLE `payment_attachment` (
     CONSTRAINT fk_payment_attachment_payment_id FOREIGN KEY (payment_id) REFERENCES `payment`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_payment_attachment_attachment_id FOREIGN KEY (attachment_id) REFERENCES `attachment`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT uk_payment_attachment_attachment_id UNIQUE (attachment_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `payment_license_action` (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -413,7 +479,7 @@ CREATE TABLE `payment_license_action` (
     CONSTRAINT fk_payment_license_action_payment_id FOREIGN KEY (payment_id) REFERENCES `payment`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_payment_license_action_license_id FOREIGN KEY (license_id) REFERENCES `license`(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_payment_license_action_responsible_user_id FOREIGN KEY (responsible_user_id) REFERENCES `user`(id) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 -- Verificacion del esquema final: tablas, dinero decimal, FKs y ausencia de saldos ficticios.
 SELECT table_name, engine FROM information_schema.tables
@@ -482,7 +548,7 @@ SELECT @client_rows_before AS rows_before, COUNT(*) AS rows_after,
 -- BEGIN 20261028-01-sincronizacion-clientes-angrybox.sql
 -- Seccion 06 de 11
 -- Recepción Angrybox: dos tablas nuevas, sin alterar clientes, saldos, licencias ni pagos históricos.
--- Precondiciones: MySQL 8.0.16+, InnoDB, nombres físicos minúsculos y IDs BIGINT con signo.
+-- Precondiciones: MySQL 5.7.24, InnoDB, nombres físicos minúsculos y IDs BIGINT con signo.
 -- Requiere las migraciones de auditoría y modelo de portal anteriores.
 -- Aplicación detenida, copia/backup verificado. Ejecutar una vez; sin --force.
 -- DDL hace COMMIT implícito: no promete rollback global. No se ejecuta automáticamente.
@@ -501,7 +567,7 @@ CREATE TABLE angrybox_sync_state (
     CONSTRAINT fk_ab_state_created FOREIGN KEY (created_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_ab_state_modified FOREIGN KEY (modified_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_ab_state_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE angrybox_sync_batch (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -523,7 +589,7 @@ CREATE TABLE angrybox_sync_batch (
     CONSTRAINT fk_ab_batch_created FOREIGN KEY (created_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_ab_batch_modified FOREIGN KEY (modified_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_ab_batch_removed FOREIGN KEY (removed_by_id) REFERENCES user(id) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 -- Verificaciones: ambas tablas vacías y saldo existente conservado al desplegar.
 SHOW CREATE TABLE angrybox_sync_state;
@@ -561,7 +627,7 @@ SELECT COUNT(*) AS hidden_licenses FROM license WHERE hidden = b'1';
 
 -- BEGIN 20261030-01-entrega-pagos-angrybox.sql
 -- Seccion 08 de 11
--- MySQL 8, InnoDB; ejecutar una vez con aplicación detenida y backup verificado.
+-- MySQL 5.7.24, InnoDB; ejecutar una vez con aplicación detenida y backup verificado.
 -- Requiere el modelo de pagos y auditoría ya instalado. No modifica Payment ni saldos.
 CREATE TABLE angrybox_payment_delivery (
     payment_id BIGINT NOT NULL PRIMARY KEY,
@@ -580,7 +646,7 @@ CREATE TABLE angrybox_payment_delivery (
     CONSTRAINT fk_ab_delivery_created FOREIGN KEY (created_by_id) REFERENCES user(id),
     CONSTRAINT fk_ab_delivery_modified FOREIGN KEY (modified_by_id) REFERENCES user(id),
     CONSTRAINT fk_ab_delivery_removed FOREIGN KEY (removed_by_id) REFERENCES user(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 -- Habilita también los aprobados históricos; la fecha mínima se aplica en cada descarga.
 -- No atribuir la aprobación ni la creación histórica al operador de esta migración.
@@ -591,7 +657,7 @@ SELECT id,CURRENT_TIMESTAMP(6) FROM payment WHERE status='APROBADO' AND removeda
 -- BEGIN 20261030-02-certificados-extension-licencias.sql
 -- Seccion 09 de 11
 -- Certificados temporales por cliente. Ejecución manual, una sola vez, antes del arranque.
--- Precondiciones: MySQL 8, InnoDB, tablas client/payment/user y auditoría instaladas,
+-- Precondiciones: MySQL 5.7.24, InnoDB, tablas client/payment/user y auditoría instaladas,
 -- IDs BIGINT con signo y aplicación detenida. El generador AUTO con
 -- spring.jpa.hibernate.use-new-id-generator-mappings=false usa AUTO_INCREMENT en MySQL.
 -- Probar primero en una copia compatible con backup verificado. No crea certificados históricos
@@ -623,7 +689,7 @@ CREATE TABLE license_extension_certificate (
     CONSTRAINT fk_extension_created FOREIGN KEY (created_by_id) REFERENCES user(id),
     CONSTRAINT fk_extension_modified FOREIGN KEY (modified_by_id) REFERENCES user(id),
     CONSTRAINT fk_extension_removed FOREIGN KEY (removed_by_id) REFERENCES user(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4;
 
 -- Verificación inicial: estructura y cero certificados, sin atribuir eventos históricos.
 SHOW CREATE TABLE license_extension_certificate;
@@ -636,7 +702,7 @@ WHERE c.client_id <> p.client_id OR c.expires_at <= c.starts_at;
 -- BEGIN 20261030-03-correccion-pagos-pendientes.sql
 -- Seccion 10 de 11
 -- Corrección administrativa de pagos pendientes. Ejecución manual antes del arranque.
--- Precondiciones: MySQL 8, InnoDB, tabla payment existente; aplicación detenida.
+-- Precondiciones: MySQL 5.7.24, InnoDB, tabla payment existente; aplicación detenida.
 -- Probar primero sobre una copia compatible con backup verificado.
 -- Conserva los datos históricos: NULL utiliza los valores actuales para idempotencia.
 -- La primera corrección guarda la huella original, sin alterar la clave de presentación.
@@ -652,7 +718,7 @@ SELECT COUNT(*) AS huellas_iniciales FROM payment WHERE original_editable_hash I
 -- BEGIN 20261031-01-correccion-destino-bancario-pagos.sql
 -- Seccion 11 de 11
 -- Corrección administrativa del destino de pagos pendientes. Ejecución manual antes del arranque.
--- Precondiciones: MySQL 8, InnoDB, tabla payment existente y script
+-- Precondiciones: MySQL 5.7.24, InnoDB, tabla payment existente y script
 -- 20261030-03-correccion-pagos-pendientes.sql aplicado; aplicación detenida.
 -- Probar primero en una copia compatible con backup verificado. Conserva los datos históricos.
 -- NULL compara la fotografía actual; la primera corrección del destino conserva su huella original.
@@ -666,3 +732,178 @@ SHOW COLUMNS FROM payment LIKE 'original_destination_hash';
 SELECT COUNT(*) AS huellas_iniciales FROM payment WHERE original_destination_hash IS NOT NULL;
 -- END 20261031-01-correccion-destino-bancario-pagos.sql
 
+
+-- Compatibilidad MySQL 5.7.24: reemplazo efectivo de los CHECK ignorados por 5.7.
+-- Aplicar UNA SOLA VEZ sobre el modelo de portal ya creado; NO borra pagos ni altera columnas.
+-- También se incluye al final de 20261102-01-migracion-consolidada.sql:
+-- si se ejecutó ese consolidado nuevo, NO ejecutar este archivo por separado.
+-- Precondiciones: aplicación detenida, backup recuperable, InnoDB, IDs BIGINT con signo,
+-- esquema seleccionado y secciones 01 a 11 del consolidado anterior terminadas.
+-- No completa una migración parcial: revisar primero tablas/columnas y registro de errores.
+-- Requiere CREATE ROUTINE, EXECUTE y TRIGGER; con binlog pueden requerirse permisos adicionales.
+-- Probar primero en copia MySQL 5.7.24; no aplicar a una base compartida por esta entrega.
+-- Conserva filas y auditoría. Si hay datos inválidos, aborta SIN corregirlos automáticamente.
+-- El cliente DEBE detenerse al primer error, sin --force. DDL hace COMMIT implícito.
+-- No hay rollback global. No ejecutar si ya existen estos triggers.
+SELECT DATABASE() AS esquema_destino, VERSION() AS version_motor;
+DELIMITER $$
+CREATE PROCEDURE cm_validate_mysql57_rules()
+BEGIN
+    IF DATABASE() IS NULL OR VERSION() NOT LIKE '5.7.%' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seleccionar esquema MySQL 5.7 antes de continuar';
+    END IF;
+    IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+        AND table_name='payment' AND column_name IN ('original_editable_hash','original_destination_hash')) <> 2 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Completar y revisar primero las secciones 01 a 11; no repetir el consolidado';
+    END IF;
+    IF (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+        AND table_name IN ('client','bank_account','client_account_balance','payment','payment_status_history')
+        AND engine='InnoDB') <> 5 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Se requieren las cinco tablas de validacion InnoDB';
+    END IF;
+    IF (SELECT COUNT(*) FROM information_schema.key_column_usage WHERE table_schema=DATABASE()
+        AND table_name='payment' AND constraint_name='fk_payment_license_client'
+        AND referenced_table_schema=DATABASE() AND referenced_table_name='license'
+        AND ((ordinal_position=1 AND column_name='license_id' AND referenced_column_name='id')
+        OR (ordinal_position=2 AND column_name='client_id' AND referenced_column_name='client_id'))) <> 2 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Falta FK compuesta payment-license: revisar migracion parcial';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.triggers WHERE trigger_schema=DATABASE()
+        AND trigger_name IN ('cm_client_bi','cm_client_bu','cm_bank_account_bi','cm_bank_account_bu',
+        'cm_client_account_balance_bi','cm_client_account_balance_bu','cm_payment_bi','cm_payment_bu',
+        'cm_payment_status_history_bi','cm_payment_status_history_bu')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ya existen triggers cm_: revisar ejecucion previa, no reemplazarlos';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `client` WHERE NOT (dni IS NULL OR dni REGEXP '^[0-9]{1,8}$')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_client_dni';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `bank_account` WHERE NOT (cbu REGEXP '^[0-9]{22}$')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_account_cbu';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `client_account_balance` WHERE NOT (currency = 'ARS')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_balance_currency';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment` WHERE NOT (amount > 0)) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_payment_amount';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment` WHERE NOT (currency = 'ARS')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_payment_currency';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment` WHERE NOT (method = 'TRANSFERENCIA')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_payment_method';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment` WHERE NOT (status IN ('PENDIENTE', 'APROBADO', 'RECHAZADO'))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_payment_status';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment` WHERE NOT ((without_receipt = 1 AND no_receipt_reason IS NOT NULL AND CHAR_LENGTH(TRIM(no_receipt_reason)) > 0) OR (without_receipt = 0 AND (no_receipt_reason IS NULL OR CHAR_LENGTH(TRIM(no_receipt_reason)) = 0)))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_payment_receipt_reason';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment_status_history` WHERE NOT ((previous_status IS NULL AND new_status = 'PENDIENTE') OR (previous_status IS NOT NULL AND previous_status = 'PENDIENTE' AND new_status IN ('APROBADO','RECHAZADO')))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_history_transition';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `payment_status_history` WHERE NOT (new_status <> 'RECHAZADO' OR (reason IS NOT NULL AND CHAR_LENGTH(TRIM(reason)) > 0))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Datos existentes invalidos: ck_history_rejection';
+    END IF;
+END$$
+DELIMITER ;
+CALL cm_validate_mysql57_rules();
+DROP PROCEDURE cm_validate_mysql57_rules;
+
+DELIMITER $$
+CREATE TRIGGER cm_client_bi BEFORE INSERT ON `client` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.dni IS NULL OR NEW.dni REGEXP '^[0-9]{1,8}$') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_client_dni';
+    END IF;
+END$$
+CREATE TRIGGER cm_client_bu BEFORE UPDATE ON `client` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.dni IS NULL OR NEW.dni REGEXP '^[0-9]{1,8}$') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_client_dni';
+    END IF;
+END$$
+CREATE TRIGGER cm_bank_account_bi BEFORE INSERT ON `bank_account` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.cbu REGEXP '^[0-9]{22}$') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_account_cbu';
+    END IF;
+END$$
+CREATE TRIGGER cm_bank_account_bu BEFORE UPDATE ON `bank_account` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.cbu REGEXP '^[0-9]{22}$') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_account_cbu';
+    END IF;
+END$$
+CREATE TRIGGER cm_client_account_balance_bi BEFORE INSERT ON `client_account_balance` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.currency = 'ARS') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_balance_currency';
+    END IF;
+END$$
+CREATE TRIGGER cm_client_account_balance_bu BEFORE UPDATE ON `client_account_balance` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.currency = 'ARS') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_balance_currency';
+    END IF;
+END$$
+CREATE TRIGGER cm_payment_bi BEFORE INSERT ON `payment` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.amount > 0) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_amount';
+    END IF;
+    IF NOT (NEW.currency = 'ARS') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_currency';
+    END IF;
+    IF NOT (NEW.method = 'TRANSFERENCIA') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_method';
+    END IF;
+    IF NOT (NEW.status IN ('PENDIENTE', 'APROBADO', 'RECHAZADO')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_status';
+    END IF;
+    IF NOT ((NEW.without_receipt = 1 AND NEW.no_receipt_reason IS NOT NULL AND CHAR_LENGTH(TRIM(NEW.no_receipt_reason)) > 0) OR (NEW.without_receipt = 0 AND (NEW.no_receipt_reason IS NULL OR CHAR_LENGTH(TRIM(NEW.no_receipt_reason)) = 0))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_receipt_reason';
+    END IF;
+END$$
+CREATE TRIGGER cm_payment_bu BEFORE UPDATE ON `payment` FOR EACH ROW
+BEGIN
+    IF NOT (NEW.amount > 0) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_amount';
+    END IF;
+    IF NOT (NEW.currency = 'ARS') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_currency';
+    END IF;
+    IF NOT (NEW.method = 'TRANSFERENCIA') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_method';
+    END IF;
+    IF NOT (NEW.status IN ('PENDIENTE', 'APROBADO', 'RECHAZADO')) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_status';
+    END IF;
+    IF NOT ((NEW.without_receipt = 1 AND NEW.no_receipt_reason IS NOT NULL AND CHAR_LENGTH(TRIM(NEW.no_receipt_reason)) > 0) OR (NEW.without_receipt = 0 AND (NEW.no_receipt_reason IS NULL OR CHAR_LENGTH(TRIM(NEW.no_receipt_reason)) = 0))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_payment_receipt_reason';
+    END IF;
+END$$
+CREATE TRIGGER cm_payment_status_history_bi BEFORE INSERT ON `payment_status_history` FOR EACH ROW
+BEGIN
+    IF NOT ((NEW.previous_status IS NULL AND NEW.new_status = 'PENDIENTE') OR (NEW.previous_status IS NOT NULL AND NEW.previous_status = 'PENDIENTE' AND NEW.new_status IN ('APROBADO','RECHAZADO'))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_history_transition';
+    END IF;
+    IF NOT (NEW.new_status <> 'RECHAZADO' OR (NEW.reason IS NOT NULL AND CHAR_LENGTH(TRIM(NEW.reason)) > 0)) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_history_rejection';
+    END IF;
+END$$
+CREATE TRIGGER cm_payment_status_history_bu BEFORE UPDATE ON `payment_status_history` FOR EACH ROW
+BEGIN
+    IF NOT ((NEW.previous_status IS NULL AND NEW.new_status = 'PENDIENTE') OR (NEW.previous_status IS NOT NULL AND NEW.previous_status = 'PENDIENTE' AND NEW.new_status IN ('APROBADO','RECHAZADO'))) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_history_transition';
+    END IF;
+    IF NOT (NEW.new_status <> 'RECHAZADO' OR (NEW.reason IS NOT NULL AND CHAR_LENGTH(TRIM(NEW.reason)) > 0)) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ck_history_rejection';
+    END IF;
+END$$
+DELIMITER ;
+-- Verificacion: diez triggers (INSERT y UPDATE en cada una de las cinco tablas).
+SELECT event_object_table, trigger_name, action_timing, event_manipulation
+FROM information_schema.triggers WHERE trigger_schema=DATABASE() AND trigger_name IN
+('cm_client_bi','cm_client_bu','cm_bank_account_bi','cm_bank_account_bu',
+'cm_client_account_balance_bi','cm_client_account_balance_bu','cm_payment_bi','cm_payment_bu',
+'cm_payment_status_history_bi','cm_payment_status_history_bu') ORDER BY event_object_table, trigger_name;
