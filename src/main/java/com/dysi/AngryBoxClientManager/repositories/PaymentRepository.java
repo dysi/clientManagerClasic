@@ -14,6 +14,10 @@ import com.dysi.AngryBoxClientManager.models.Payment;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Payment> {
 
+    @Query(value = "select p from Payment p join fetch p.client where p.status = :status and p.removeDate is null order by p.creationDate, p.id",
+            countQuery = "select count(p) from Payment p where p.status = :status and p.removeDate is null")
+    Page<Payment> findPendingReminder(@Param("status") com.dysi.AngryBoxClientManager.models.PaymentStatus status, Pageable pageable);
+
     java.util.Optional<Payment> findByClientIdAndSubmissionKey(Long clientId, String submissionKey);
     java.util.Optional<Payment> findByIdAndClientIdAndRemoveDateIsNull(Long id, Long clientId);
 

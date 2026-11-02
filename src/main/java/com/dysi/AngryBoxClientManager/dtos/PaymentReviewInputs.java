@@ -9,6 +9,17 @@ import javax.validation.constraints.*;
 
 public final class PaymentReviewInputs {
     private PaymentReviewInputs() { }
+    public static class Correction {
+        @Positive public Long bankAccountId;
+        @Pattern(regexp = "[a-f0-9]{64}") public String accountRevision;
+        @NotNull @PositiveOrZero public Long version;
+        @Positive public Long licenseId;
+        @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 12, fraction = 2)
+        public java.math.BigDecimal amount;
+        @NotNull public java.time.LocalDateTime issuedAt;
+        @NotBlank @Size(max = 50) public String contactPhone;
+        @NotBlank @Size(max = 1000) public String reason;
+    }
     public static class CommentInput {
         @NotBlank @Size(max = 4000) public String text;
         @NotNull public CommentVisibility visibility;

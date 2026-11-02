@@ -136,6 +136,7 @@ public class AngryboxPaymentSyncService {
             row.metodo = payment.getMethod().name();
             row.issuedAt = payment.getIssuedAt().toString();
             row.creationDate = payment.getCreationDate() == null ? null : payment.getCreationDate().toInstant().toString();
+            row.cuentaDestino = cuentaDestino(payment);
             page.pagos.add(row);
             page.next = row.id;
         }
@@ -167,6 +168,22 @@ public class AngryboxPaymentSyncService {
 
     private String identity(Long id, String code, String dni, String cuit) {
         return hashValues(id, code, dni, cuit);
+    }
+
+    /** Conservar la fotografia original del pago: no consultar la cuenta bancaria editable actual. */
+    private CuentaDestino cuentaDestino(Payment payment) {
+        if (AngryboxClientMatcher.text(payment.getDestinationBank()).isEmpty()
+                && AngryboxClientMatcher.text(payment.getDestinationHolder()).isEmpty()
+                && AngryboxClientMatcher.text(payment.getDestinationCbu()).isEmpty()
+                && AngryboxClientMatcher.text(payment.getDestinationAlias()).isEmpty()) {
+            return null;
+        }
+        CuentaDestino cuenta = new CuentaDestino();
+        cuenta.banco = payment.getDestinationBank();
+        cuenta.titular = payment.getDestinationHolder();
+        cuenta.cbu = payment.getDestinationCbu();
+        cuenta.alias = payment.getDestinationAlias();
+        return cuenta;
     }
 
     private String paymentHash(Payment payment) {

@@ -15,6 +15,11 @@ public class WebPaymentReviewController {
     private final PaymentReviewService service;
     public WebPaymentReviewController(PaymentReviewService service) { this.service = service; }
     @GetMapping("/detail") public PaymentReviewViews.Detail detail(@PathVariable Long id) { return service.detail(id); }
+    @GetMapping("/bank-accounts") public java.util.List<PaymentReviewViews.BankDestination> bankAccounts(@PathVariable Long id) {
+        return service.bankAccounts(id);
+    }
+    @PostMapping("/correct") public PaymentReviewViews.Detail correct(@PathVariable Long id,
+            @Valid @RequestBody PaymentReviewInputs.Correction input) { return service.correct(id, input); }
     @GetMapping("/comments") public Page<PaymentReviewViews.Comment> comments(@PathVariable Long id,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.comments(id, page, size); }
     @PostMapping("/comments") public PaymentReviewViews.Comment comment(@PathVariable Long id, @Valid @RequestBody PaymentReviewInputs.CommentInput input) { return service.comment(id, input); }

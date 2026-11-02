@@ -10,6 +10,13 @@ import java.util.Objects;
 /** Detecta que los datos bancarios revisados cambiaron mientras se completaba el formulario. */
 final class BankAccountRevision {
     private BankAccountRevision() { }
+    /** Incluye explícitamente el ID enviado además de la revisión para detectar claves reutilizadas con otra cuenta. */
+    static String submissionHash(Long accountId, String revision) {
+        return ReviewFingerprint.of(accountId.toString(), revision);
+    }
+    static String submissionHash(Payment payment) {
+        return submissionHash(payment.getBankAccount().getId(), of(payment));
+    }
     static String of(BankAccount account) {
         return hash(account.getId(), account.getBank().getName(), account.getHolder(), account.getCbu(), account.getAlias());
     }

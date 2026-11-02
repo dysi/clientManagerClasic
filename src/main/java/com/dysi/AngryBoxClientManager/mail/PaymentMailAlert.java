@@ -26,12 +26,6 @@ public class PaymentMailAlert {
     public void afterCreation(Payment payment, int receiptCount) {
         try {
             if (!mail.enabled() || !config.getProperty("mail.builder.alert-payment-active", Boolean.class, false)) return;
-            String base = config.getRequiredProperty("clientmanager.public-url").trim();
-            URI uri = URI.create(base);
-            if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) || uri.getHost() == null
-                    || uri.getRawQuery() != null || uri.getRawFragment() != null || uri.getUserInfo() != null) {
-                throw new IllegalArgumentException("URL pública inválida");
-            }
             NumberFormat amount = NumberFormat.getNumberInstance(new Locale("es", "AR"));
             amount.setMinimumFractionDigits(2); amount.setMaximumFractionDigits(2);
             Map<PaymentMailVariable, String> values = new EnumMap<>(PaymentMailVariable.class);
@@ -45,7 +39,7 @@ public class PaymentMailAlert {
             values.put(PaymentMailVariable.CURRENCY, payment.getCurrency().toString());
             values.put(PaymentMailVariable.ISSUED_AT, payment.getIssuedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
             values.put(PaymentMailVariable.RECEIPTS, Integer.toString(receiptCount));
-            values.put(PaymentMailVariable.PENDING_URL, base.replaceAll("/+$", "") + "/ui/#/payments?status=PENDIENTE");
+            values.put(PaymentMailVariable.PENDING_URL, pendingUrl(config));
             String subject = render(config.getRequiredProperty("mail.builder.alert-payment-asunto"), values, false);
             String body = render(config.getRequiredProperty("mail.builder.alert-payment-body"), values, true);
             String recipients = config.getRequiredProperty("mail.builder.alert-payment-to");
@@ -55,6 +49,16 @@ public class PaymentMailAlert {
         } catch (Exception error) {
             LOG.error("No se pudo preparar la alerta del pago {} ({}); sin reintento.", payment.getId(), error.getClass().getSimpleName());
         }
+    }
+
+    static String pendingUrl(Environment config) {
+        String base = config.getRequiredProperty("clientmanager.public-url").trim();
+        URI uri = URI.create(base);
+        if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) || uri.getHost() == null
+                || uri.getRawQuery() != null || uri.getRawFragment() != null || uri.getUserInfo() != null) {
+            throw new IllegalArgumentException("URL pública inválida");
+        }
+        return base.replaceAll("/+$", "") + "/ui/#/payments?status=PENDIENTE";
     }
 
     private String render(String template, Map<PaymentMailVariable, String> values, boolean html) {

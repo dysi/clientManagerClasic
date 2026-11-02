@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.validation.constraints.*;
 
-/** Contrato de entrega v1; no expone adjuntos, cuentas bancarias ni comentarios privados. */
+/** Contrato de entrega v1; solo incluye el destino bancario guardado en el pago, sin adjuntos ni comentarios privados. */
 public final class AngryboxPaymentSync {
     public static class Matching {
         @NotNull
@@ -42,6 +42,14 @@ public final class AngryboxPaymentSync {
         public String metodo;
         public String issuedAt;
         public String creationDate;
+        public CuentaDestino cuentaDestino;
+    }
+
+    public static class CuentaDestino {
+        public String banco;
+        public String titular;
+        public String cbu;
+        public String alias;
     }
 
     public static class Ack {

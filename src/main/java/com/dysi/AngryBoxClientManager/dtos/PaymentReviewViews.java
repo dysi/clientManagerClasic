@@ -8,6 +8,10 @@ import java.util.List;
 public final class PaymentReviewViews {
     private PaymentReviewViews() { }
     public static class Actor { public Long id; public String name; }
+    public static class BankDestination {
+        public Long id;
+        public String bank, holder, cbu, alias, revision;
+    }
     public static class Detail {
         public AdminViews.PaymentView payment;
         public long version;

@@ -18,6 +18,7 @@ import { useConfirmAction } from "../../composables/useConfirmAction";
 import { request } from "../../services/http";
 import { displayDateTime, money } from "../../services/format";
 import PaymentApprovalDialog from "./PaymentApprovalDialog.vue";
+import PaymentCorrectionDialog from "./PaymentCorrectionDialog.vue";
 import { reviewDetail, rejectPayment, receiptUrl, paymentLabels, originLabel, type ReviewDetail, type ReviewComment, type ReviewReceipt, type History, type LicenseEvent } from "./review";
 const route = useRoute(), router = useRouter();
 const id = Number(route.params.id), endpoint = `/web/api/payments/${id}`;
@@ -25,6 +26,10 @@ const back = computed(() => typeof route.query.returnTo === "string" && route.qu
 const confirm = useConfirmAction();
 const detail = ref<ReviewDetail | null>(null), loading = ref(true), loadError = ref("");
 const approving = ref(false), rejecting = ref(false);
+const editing = ref(false);
+async function corrected(value: ReviewDetail) {
+  detail.value = value; editing.value = false; await comments.load();
+}
 const form = ref({ text: "", visibility: "PUBLICO" as "PUBLICO" | "PRIVADO" });
 const rejection = ref({ reason: "" });
 const { saving: rejectingSave, error: rejectionError, fields: rejectionFields, save: saveRejection, reset: resetRejection } = useDraft(rejection);
@@ -75,15 +80,16 @@ async function approved() { approving.value = false; await refreshAll(); }
         <div><dt class="text-sm text-muted-color">Presentación</dt><dd>{{ displayDateTime(detail.createdAt) }}</dd></div>
         <div><dt class="text-sm text-muted-color">Teléfono informado</dt><dd class="break-words">{{ detail.contactPhone }}</dd></div>
         <div><dt class="text-sm text-muted-color">Forma de pago</dt><dd>Transferencia</dd></div>
-        <div><dt class="text-sm text-muted-color">Banco destinatario original</dt><dd class="break-words">{{ detail.destinationBank }}</dd></div>
-        <div><dt class="text-sm text-muted-color">Titular original</dt><dd class="break-words">{{ detail.destinationHolder }}</dd></div>
-        <div><dt class="text-sm text-muted-color">CBU original</dt><dd class="break-all font-mono">{{ detail.destinationCbu }}</dd></div>
-        <div><dt class="text-sm text-muted-color">Alias original</dt><dd class="break-all">{{ detail.destinationAlias || 'Sin alias' }}</dd></div>
+        <div><dt class="text-sm text-muted-color">Banco destinatario</dt><dd class="break-words">{{ detail.destinationBank }}</dd></div>
+        <div><dt class="text-sm text-muted-color">Titular destinatario</dt><dd class="break-words">{{ detail.destinationHolder }}</dd></div>
+        <div><dt class="text-sm text-muted-color">CBU destinatario</dt><dd class="break-all font-mono">{{ detail.destinationCbu }}</dd></div>
+        <div><dt class="text-sm text-muted-color">Alias destinatario</dt><dd class="break-all">{{ detail.destinationAlias || 'Sin alias' }}</dd></div>
         <div><dt class="text-sm text-muted-color">Usuario atribuido</dt><dd>{{ detail.submittedBy?.name || 'Sin dato histórico' }}<span v-if="detail.submittedBy"> (#{{ detail.submittedBy.id }})</span></dd></div>
         <div><dt class="text-sm text-muted-color">Origen de la presentación</dt><dd>{{ originLabel(detail.origin) }}</dd></div>
         <div v-if="detail.withoutReceipt" class="sm:col-span-2"><dt class="text-sm text-muted-color">Motivo original de ausencia de comprobante</dt><dd class="whitespace-pre-wrap break-words">{{ detail.noReceiptReason }}</dd></div>
       </dl>
       <div v-if="detail.payment.status === 'PENDIENTE'" class="mt-6 flex flex-wrap justify-end gap-3">
+        <Button type="button" label="Editar pago" icon="pi pi-pencil" outlined :disabled="saving" @click="editing = true" />
         <Button type="button" label="Rechazar" icon="pi pi-times" severity="danger" outlined :disabled="saving" @click="rejecting = true; rejectionError = ''" />
         <Button type="button" label="Aprobar" icon="pi pi-check" :disabled="saving" @click="approving = true" />
       </div>
@@ -126,6 +132,7 @@ async function approved() { approving.value = false; await refreshAll(); }
     </template></Card>
   </div>
   <PaymentApprovalDialog v-if="approving && detail" :detail="detail" @close="approving = false" @approved="approved" />
+  <PaymentCorrectionDialog v-if="editing && detail" :detail="detail" @close="editing = false" @saved="corrected" />
   <Dialog :visible="rejecting" modal header="Rechazar pago" class="w-[min(36rem,calc(100vw-2rem))]" :closable="!rejectingSave" :close-on-escape="!rejectingSave" @update:visible="!$event && closeRejection()">
     <form id="rejectPayment" class="flex flex-col gap-4" :aria-busy="rejectingSave" @submit.prevent="reject">
       <Message severity="warn" :closable="false">El motivo será público y visible para el cliente. El rechazo no puede revertirse.</Message>

@@ -32,7 +32,11 @@ Base `/api/payments/sync`, query `username` y `companyId` obligatorios:
    `{versionContrato:1,until,next,hasMore,pagos:[...]}`. Para continuar, conservar
    until y usar after=next, avanzando también cuando una fila no pueda incorporarse.
    Cada pago contiene id, clientId, nombre, identity, hash, importe decimal, moneda,
-   método, issuedAt local ISO y creationDate como instante ISO.
+   método, issuedAt local ISO y creationDate como instante ISO. Incluye opcionalmente
+   `cuentaDestino: {banco,titular,cbu,alias}`, obtenida exclusivamente de los campos
+   destinationBank/destinationHolder/destinationCbu/destinationAlias de Payment.
+   No consulta los datos editables actuales de BankAccount. Si no hay datos de destino,
+   el campo es null y Angrybox conserva el comportamiento anterior.
 3. `POST /ack`: `{paymentId,movementId,hash}`. Después del commit local de Angrybox.
    Respuesta `{confirmed:true}`. La misma confirmación es idempotente; otra referencia
    o contenido causa 409. Persiste empresa, movimiento, fecha y auditoría de entrega.
@@ -64,8 +68,10 @@ conciliar ambos sistemas. Una anulación comercial local no implica una nueva en
 
 Los pagos sin cliente local permanecen pendientes y Angrybox muestra sus errores.
 La cola no crea cobros, clientes, saldos ni habilita QR: conserva las restricciones
-actuales de presentación y revisión de Payment. No exporta adjuntos, datos bancarios
-ni comentarios privados.
+actuales de presentación y revisión de Payment. Solo exporta los datos bancarios de
+destino guardados en el pago para documentar el movimiento en Angrybox, sin adjuntos,
+credenciales ni comentarios privados. La información adicional no cambia la huella
+comercial ni invalida confirmaciones anteriores. No requiere cambios de esquema.
 
 Verificación: `clean verify` con JDK 11, suite existente y comprobación manual aislada
 H2/HTTP con el ApiClient/orquestador de Angrybox. Incluye rollback de aprobación por

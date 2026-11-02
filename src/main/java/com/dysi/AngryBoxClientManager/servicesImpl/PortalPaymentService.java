@@ -205,12 +205,11 @@ public class PortalPaymentService {
                 + "where pc.payment.id = :id and pc.comment.occurredAt = (select h.occurredAt from PaymentStatusHistory h "
                 + "where h.payment.id = :id and h.previousStatus is null) order by pc.id", String.class)
                 .setParameter("id", payment.getId()).setMaxResults(1).getResultList();
-        return Objects.equals(payment.getBankAccount().getId(), input.bankAccountId)
-                && BankAccountRevision.of(payment).equals(input.accountRevision)
-                && Objects.equals(payment.getLicense() == null ? null : payment.getLicense().getId(), input.licenseId)
-                && payment.getAmount().compareTo(input.amount) == 0
-                && payment.getIssuedAt().equals(input.issuedAt.truncatedTo(ChronoUnit.MICROS))
-                && payment.getContactPhone().equals(input.contactPhone.trim()) && payment.getMethod() == input.method
+        return Objects.equals(payment.getOriginalDestinationHash() == null ? BankAccountRevision.submissionHash(payment)
+                : payment.getOriginalDestinationHash(), BankAccountRevision.submissionHash(input.bankAccountId, input.accountRevision))
+                && Objects.equals(payment.getOriginalEditableHash() == null ? PaymentSubmissionFingerprint.of(payment)
+                        : payment.getOriginalEditableHash(), PaymentSubmissionFingerprint.of(input.licenseId, input.amount, input.issuedAt, input.contactPhone))
+                && payment.getMethod() == input.method
                 && payment.getWithoutReceipt() == input.withoutReceipt
                 && Objects.equals(payment.getNoReceiptReason(), text(input.noReceiptReason)) && sameReceipts
                 && Objects.equals(originalComments.isEmpty() ? null : originalComments.get(0), text(input.comment));

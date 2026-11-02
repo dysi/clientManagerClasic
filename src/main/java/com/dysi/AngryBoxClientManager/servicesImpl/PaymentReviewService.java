@@ -42,6 +42,71 @@ public class PaymentReviewService {
 
     public PaymentReviewViews.Detail detail(Long id) { actor(); return detailView(payment(id)); }
 
+    public List<PaymentReviewViews.BankDestination> bankAccounts(Long id) {
+        actor(); payment(id);
+        return em.createQuery("select a from BankAccount a join fetch a.bank b where a.removeDate is null "
+                + "and a.active = true and b.removeDate is null and b.active = true order by b.name, a.id", BankAccount.class)
+                .getResultList().stream().map(account -> {
+                    PaymentReviewViews.BankDestination view = new PaymentReviewViews.BankDestination();
+                    view.id = account.getId(); view.bank = account.getBank().getName(); view.holder = account.getHolder();
+                    view.cbu = account.getCbu(); view.alias = account.getAlias(); view.revision = BankAccountRevision.of(account);
+                    return view;
+                }).collect(Collectors.toList());
+    }
+
+    /** Corrección previa a la decisión, atómica con su evidencia privada e independiente de la aprobación. */
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, timeout = 120)
+    public PaymentReviewViews.Detail correct(Long id, PaymentReviewInputs.Correction input) {
+        User actor = actor(); Payment payment = lockPayment(id); pending(payment, input.version);
+        if (input.issuedAt.getYear() < 1000 || input.issuedAt.getYear() > 9999) bad("La fecha de emisión no es válida.");
+        License license = input.licenseId == null ? null : em.find(License.class, input.licenseId, LockModeType.PESSIMISTIC_WRITE);
+        if (license != null) em.refresh(license);
+        if (input.licenseId != null && (license == null || license.getRemoveDate() != null
+                || license.getClient() == null || !license.getClient().getId().equals(payment.getClient().getId())))
+            bad("La licencia no debe estar anulada y debe pertenecer al cliente del pago.");
+        String previousHash = PaymentSubmissionFingerprint.of(payment);
+        BankAccount account = null;
+        if (input.bankAccountId != null) {
+            account = em.find(BankAccount.class, input.bankAccountId, LockModeType.PESSIMISTIC_READ);
+            if (account == null) bad("La cuenta destinataria no existe.");
+            em.refresh(account);
+            Bank bank = em.find(Bank.class, account.getBank().getId(), LockModeType.PESSIMISTIC_READ);
+            if (bank != null) em.refresh(bank);
+            if (account.getRemoveDate() != null || !account.getActive() || bank == null || !bank.getActive() || bank.getRemoveDate() != null)
+                conflict("La cuenta destinataria ya no está disponible. Actualizá las cuentas y elegí otra.");
+            if (!BankAccountRevision.of(account).equals(input.accountRevision))
+                conflict("Los datos bancarios cambiaron. Actualizá las cuentas y revisá el destino antes de guardar.");
+        } else if (input.accountRevision != null) bad("Elegí una cuenta para cambiar el destino bancario.");
+        boolean destinationChanged = account != null && !BankAccountRevision.of(payment).equals(BankAccountRevision.of(account));
+        if (!destinationChanged && previousHash.equals(PaymentSubmissionFingerprint.of(input.licenseId, input.amount, input.issuedAt, input.contactPhone)))
+            bad("Modificá al menos un dato del pago antes de guardar.");
+        String previous = correctionValues(payment);
+        payment.preserveOriginalEditableHash(previousHash);
+        if (destinationChanged) {
+            payment.preserveOriginalDestinationHash(BankAccountRevision.submissionHash(payment));
+            payment.setBankAccount(account); payment.setDestinationBank(account.getBank().getName());
+            payment.setDestinationHolder(account.getHolder()); payment.setDestinationCbu(account.getCbu());
+            payment.setDestinationAlias(account.getAlias());
+        }
+        payment.setAmount(input.amount); payment.setIssuedAt(input.issuedAt.truncatedTo(ChronoUnit.MICROS));
+        payment.setContactPhone(input.contactPhone.trim()); payment.setLicense(license);
+        Comment comment = new Comment(); comment.setVisibility(CommentVisibility.PRIVADO);
+        comment.setText("Corrección de pago pendiente. Motivo: " + input.reason.trim()
+                + "\nAntes: " + previous + "\nDespués: " + correctionValues(payment));
+        comment.setAuthor(actor); comment.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); comment.setOccurredAt(now()); em.persist(comment);
+        PaymentComment link = new PaymentComment(); link.setPayment(payment); link.setComment(comment); em.persist(link);
+        em.flush(); return detailView(payment);
+    }
+
+    private String correctionValues(Payment payment) {
+        return "importe ARS " + payment.getAmount().toPlainString() + "; emisión " + payment.getIssuedAt()
+                + "; teléfono " + payment.getContactPhone() + "; licencia "
+                + (payment.getLicense() == null ? "sin asociar" : "#" + payment.getLicense().getId())
+                + "; cuenta #" + payment.getBankAccount().getId() + "; banco " + payment.getDestinationBank()
+                + "; titular " + payment.getDestinationHolder() + "; CBU " + payment.getDestinationCbu()
+                + "; alias " + Objects.toString(payment.getDestinationAlias(), "sin alias");
+    }
+
     public Page<PaymentReviewViews.Comment> comments(Long id, int page, int size) {
         actor(); payment(id);
         return entities("pc", "PaymentComment pc join fetch pc.comment c left join fetch c.author", "PaymentComment pc join pc.comment c",

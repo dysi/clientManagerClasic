@@ -72,6 +72,24 @@ public class Payment extends AuditableEntity {
     @NotBlank @Column(name = "SUBMISSION_KEY", length = 64, nullable = false) @Size(max = 64)
     private String submissionKey;
 
+    /** Huella anterior a la primera corrección: mantiene la idempotencia de la presentación original. */
+    @JsonIgnore @Column(name = "ORIGINAL_EDITABLE_HASH", length = 64)
+    private String originalEditableHash;
+
+    /** Huella de cuenta y fotografía bancaria anterior a la primera corrección del destino. */
+    @JsonIgnore @Column(name = "ORIGINAL_DESTINATION_HASH", length = 64)
+    private String originalDestinationHash;
+
+    public String getOriginalDestinationHash() { return originalDestinationHash; }
+    public void preserveOriginalDestinationHash(String hash) {
+        if (originalDestinationHash == null) originalDestinationHash = hash;
+    }
+
+    public String getOriginalEditableHash() { return originalEditableHash; }
+    public void preserveOriginalEditableHash(String hash) {
+        if (originalEditableHash == null) originalEditableHash = hash;
+    }
+
     @Version @Column(name = "VERSION", nullable = false)
     private long version = 0;
 
