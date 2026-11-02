@@ -26,20 +26,20 @@ class MySqlPortalMigrationTests {
             execute(connection, "CREATE DATABASE " + SCHEMA + " CHARACTER SET utf8mb4");
             execute(connection, "USE " + SCHEMA);
             script(connection, "/db/legacy-portal-fixture.sql");
-            script(connection, "/db/20261026-01-auditoria-entidades.sql");
-            assertThrows(SQLException.class, () -> script(connection, "/db/20261026-03-modelo-portal-pagos.sql"));
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-01-auditoria-entidades.sql");
+            assertThrows(SQLException.class, () -> script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-03-modelo-portal-pagos.sql"));
             assertEquals(2, count(connection, "payment"));
             execute(connection, "DROP PROCEDURE cm_require_empty_payment");
             execute(connection, "CREATE TABLE unexpected_dependency (id BIGINT PRIMARY KEY, payment_id BIGINT, FOREIGN KEY (payment_id) REFERENCES payment(id)) ENGINE=InnoDB");
-            assertThrows(SQLException.class, () -> script(connection, "/db/20261026-02-vaciar-pagos-antiguos.sql"));
+            assertThrows(SQLException.class, () -> script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-02-vaciar-pagos-antiguos.sql"));
             assertEquals(2, count(connection, "payment"));
             execute(connection, "DROP PROCEDURE cm_check_legacy_payment_dependencies");
             execute(connection, "DROP TABLE unexpected_dependency");
-            script(connection, "/db/20261026-02-vaciar-pagos-antiguos.sql");
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-02-vaciar-pagos-antiguos.sql");
             assertEquals(0, count(connection, "payment"));
             assertEquals(2, count(connection, "client")); assertEquals(1, count(connection, "user"));
             assertEquals(1, count(connection, "license")); assertEquals(1, count(connection, "licensestatus"));
-            script(connection, "/db/20261026-03-modelo-portal-pagos.sql");
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-03-modelo-portal-pagos.sql");
             assertEquals(0, count(connection, "client_account_balance"));
             execute(connection, "INSERT INTO bank(id,name,normalized_name,active) VALUES (100,'Prueba','prueba',1)");
             execute(connection, "INSERT INTO bank_account(id,bank_id,holder,cbu,active) VALUES (101,100,'Titular','0000000000000000000000',1)");
@@ -90,11 +90,18 @@ class MySqlPortalMigrationTests {
 
     /** Respeta DELIMITER de los scripts MySQL; detiene la ejecucion al primer error. */
     private static void script(Connection connection, String resource) throws Exception {
+        String[] location = resource.split("#", 2);
+        boolean inSection = location.length == 1;
         String delimiter = ";"; StringBuilder sql = new StringBuilder();
-        try (InputStream input = Objects.requireNonNull(MySqlPortalMigrationTests.class.getResourceAsStream(resource));
+        try (InputStream input = Objects.requireNonNull(MySqlPortalMigrationTests.class.getResourceAsStream(location[0]));
                 BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                if (location.length == 2) {
+                    if (line.equals("-- BEGIN " + location[1])) { inSection = true; continue; }
+                    if (line.equals("-- END " + location[1])) break;
+                    if (!inSection) continue;
+                }
                 String trimmed = line.replace("\uFEFF", "").trim();
                 if (trimmed.isEmpty() || trimmed.startsWith("--")) continue;
                 if (trimmed.startsWith("DELIMITER ")) { delimiter = trimmed.substring(10).trim(); continue; }
@@ -105,6 +112,7 @@ class MySqlPortalMigrationTests {
                 }
             }
         }
+        if (!inSection) throw new IllegalArgumentException("Seccion SQL inexistente: " + resource);
         if (!sql.toString().trim().isEmpty()) throw new IllegalArgumentException("SQL sin terminador: " + resource);
     }
 }

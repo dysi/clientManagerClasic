@@ -27,6 +27,11 @@ import org.springframework.web.server.ResponseStatusException;
 @PreAuthorize("hasRole('ADMIN')")
 @Transactional(readOnly = true)
 public class PaymentReviewService {
+    // Una licencia oculta solo se excluye cuando su estado histórico vigente tiene bloqueo forzado.
+    private static final String APPROVAL_LICENSES = " from License l where l.client.id = :clientId and l.removeDate is null "
+            + "and not (l.hidden = true and exists (select s.id from LicenseStatus s where s.license = l "
+            + "and s.removeDate is null and s.forcedLock = true and s.id = "
+            + "(select min(t.id) from LicenseStatus t where t.license = l and t.removeDate is null)))";
     private final EntityManager em;
     private final PaymentRepository payments;
     private final LicenseRepository licenses;
@@ -41,6 +46,22 @@ public class PaymentReviewService {
     }
 
     public PaymentReviewViews.Detail detail(Long id) { actor(); return detailView(payment(id)); }
+
+    public PaymentReviewViews.ApprovalLicenses approvalLicenses(Long id) {
+        actor(); Payment payment = payment(id);
+        List<License> found = em.createQuery("select l" + APPROVAL_LICENSES + " order by l.id", License.class)
+                .setParameter("clientId", payment.getClient().getId()).setMaxResults(101).getResultList();
+        checkApprovalSize(found.size());
+        Map<Long, LicenseStatus> states = licenseStates(found.stream().map(License::getId).collect(Collectors.toList()));
+        PaymentReviewViews.ApprovalLicenses view = new PaymentReviewViews.ApprovalLicenses();
+        view.today = LocalDate.now(businessZone); view.suggestedDate = suggestedDate(view.today, null);
+        view.licenses = found.stream().map(license -> option(license, states.get(license.getId()))).collect(Collectors.toList());
+        return view;
+    }
+
+    private void checkApprovalSize(int count) {
+        if (count > 100) bad("El cliente tiene más de 100 licencias para revisar. El límite actual de aprobación es 100; no se aprobó el pago ni se omitieron licencias.");
+    }
 
     public List<PaymentReviewViews.BankDestination> bankAccounts(Long id) {
         actor(); payment(id);
@@ -150,11 +171,16 @@ public class PaymentReviewService {
                 cb.equal(root.get("client").get("id"), payment.getClient().getId()), cb.isNull(root.get("removeDate")),
                 cb.like(cb.lower(cb.coalesce(root.get("companyName"), "")), pattern, '!')), pagination);
         List<Long> ids = result.stream().map(License::getId).collect(Collectors.toList());
+        Map<Long, LicenseStatus> states = licenseStates(ids);
+        return result.map(license -> option(license, states.get(license.getId())));
+    }
+
+    private Map<Long, LicenseStatus> licenseStates(List<Long> ids) {
         Map<Long, LicenseStatus> states = new HashMap<>();
         if (!ids.isEmpty()) for (LicenseStatus state : em.createQuery("select s from LicenseStatus s where s.license.id in :ids "
                 + "and s.removeDate is null and s.id = (select min(t.id) from LicenseStatus t where t.license = s.license and t.removeDate is null)", LicenseStatus.class)
                 .setParameter("ids", ids).getResultList()) states.put(state.getLicense().getId(), state);
-        return result.map(license -> option(license, states.get(license.getId())));
+        return states;
     }
 
     @Transactional
@@ -205,13 +231,23 @@ public class PaymentReviewService {
     private Plan plan(Payment payment, PaymentReviewInputs.Options input, boolean lock) {
         Plan plan = new Plan(); plan.view = new PaymentReviewViews.Preview(); plan.view.today = LocalDate.now(businessZone);
         plan.view.licenses = new ArrayList<>(); plan.changes = new ArrayList<>();
-        List<String> fingerprint = new ArrayList<>(List.of(payment.getId().toString(), Long.toString(payment.getVersion()), plan.view.today.toString()));
+        List<String> fingerprint = new ArrayList<>(List.of(payment.getId().toString(), Long.toString(payment.getVersion()),
+                plan.view.today.toString(), Boolean.toString(input.reviewAllLicenses)));
+        if (input.reviewAllLicenses) {
+            List<Long> currentIds = em.createQuery("select l.id" + APPROVAL_LICENSES, Long.class)
+                    .setParameter("clientId", payment.getClient().getId()).setMaxResults(101).getResultList();
+            checkApprovalSize(currentIds.size());
+            Set<Long> requestedIds = input.licenses.stream().map(action -> action.licenseId).collect(Collectors.toSet());
+            if (requestedIds.size() != input.licenses.size() || !requestedIds.equals(new HashSet<>(currentIds)))
+                conflict("Cambió el listado de licencias del cliente. Volvé a abrir la aprobación y revisá todas las licencias.");
+        }
         Set<Long> seen = new HashSet<>();
         List<PaymentReviewInputs.LicenseAction> actions = new ArrayList<>(input.licenses);
         actions.sort(Comparator.comparing(action -> action.licenseId));
         for (PaymentReviewInputs.LicenseAction action : actions) {
             if (!seen.add(action.licenseId)) bad("No repitas una licencia en la aprobación.");
-            if (!action.unlock && !action.updateExpiry) bad("Elegí al menos una acción por licencia o quitá la licencia del envío.");
+            if (!input.reviewAllLicenses && !action.unlock && !action.updateExpiry)
+                bad("Elegí al menos una acción por licencia o quitá la licencia del envío.");
             License license = lock ? em.find(License.class, action.licenseId, LockModeType.PESSIMISTIC_WRITE) : em.find(License.class, action.licenseId);
             if (lock && license != null) em.refresh(license);
             if (license == null || license.getRemoveDate() != null || license.getClient() == null
@@ -275,20 +311,20 @@ public class PaymentReviewService {
     private PaymentReviewViews.LicenseOption option(License license, LicenseStatus state) {
         PaymentReviewViews.LicenseOption view = new PaymentReviewViews.LicenseOption(); view.id = license.getId(); view.companyId = license.getCompanyId();
         view.companyName = license.getCompanyName(); view.today = LocalDate.now(businessZone); view.lockDate = state == null ? null : date(state.getLockDate());
-        view.forcedLock = state != null && state.isForcedLock(); view.status = status(view.forcedLock, view.lockDate);
+        view.forcedLock = state != null && state.isForcedLock(); view.hidden = license.isHidden(); view.status = status(view.forcedLock, view.lockDate);
         view.suggestedDate = suggestedDate(view.today, view.lockDate);
         view.revision = ReviewFingerprint.of(view.id.toString(), license.getClient().getId().toString(), license.getCompanyName(),
-                String.valueOf(license.getCompanyId()), state == null ? null : state.getId().toString(), Boolean.toString(view.forcedLock),
+                String.valueOf(license.getCompanyId()), Boolean.toString(view.hidden), state == null ? null : state.getId().toString(), Boolean.toString(view.forcedLock),
                 state == null || state.getLockDate() == null ? null : Long.toString(state.getLockDate().getTimeInMillis()),
                 state == null ? null : String.valueOf(state.getLimitTransaction())); return view;
     }
     static LocalDate suggestedDate(LocalDate today, LocalDate previous) {
-        LocalDate next = today.plusMonths(1).withDayOfMonth(10);
+        LocalDate next = today.plusMonths(1).withDayOfMonth(20);
         return previous != null && previous.isAfter(next) ? previous : next;
     }
     private void copyOption(PaymentReviewViews.LicenseOption from, PaymentReviewViews.LicenseOption to) {
         to.id = from.id; to.companyId = from.companyId; to.companyName = from.companyName; to.revision = from.revision;
-        to.today = from.today; to.lockDate = from.lockDate; to.forcedLock = from.forcedLock; to.status = from.status; to.suggestedDate = from.suggestedDate;
+        to.today = from.today; to.lockDate = from.lockDate; to.forcedLock = from.forcedLock; to.hidden = from.hidden; to.status = from.status; to.suggestedDate = from.suggestedDate;
     }
     private PaymentReviewViews.Comment commentView(Comment comment) {
         PaymentReviewViews.Comment view = new PaymentReviewViews.Comment(); view.id = comment.getId(); view.text = comment.getText();

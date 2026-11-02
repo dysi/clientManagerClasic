@@ -47,8 +47,12 @@ public final class PaymentReviewViews {
     public static class LicenseOption {
         public Long id, companyId;
         public String companyName, revision, status;
-        public boolean forcedLock;
+        public boolean forcedLock, hidden;
         public LocalDate today, lockDate, suggestedDate;
+    }
+    public static class ApprovalLicenses {
+        public LocalDate today, suggestedDate;
+        public List<LicenseOption> licenses;
     }
     public static class LicensePreview extends LicenseOption {
         public boolean unlock, updateExpiry, shortening;

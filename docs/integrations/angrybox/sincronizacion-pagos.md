@@ -9,7 +9,7 @@ No amplía permisos del portal ni permite aprobar pagos mediante la API de integ
 ## Despliegue y datos
 
 Ejecutar una vez, antes de iniciar la versión nueva y con backup verificado,
-`src/main/resources/db/20261030-01-entrega-pagos-angrybox.sql` en MySQL representativo.
+`src/main/resources/db/20261102-01-migracion-consolidada.sql` en MySQL representativo.
 Crea la tabla auditada `angrybox_payment_delivery` y una entrega por aprobado histórico.
 No cambia Payment, licencias ni ClientAccountBalance. No se ejecuta automáticamente.
 Coordinar con el SQL y despliegue correspondiente de Angrybox.

@@ -37,7 +37,7 @@ class PortalAutoIncrementTests {
 
     @Test void actualMigrationDdlCreatesAutoIncrementColumnsAndPreservesPreviousIds() throws Exception {
         String script;
-        try (InputStream input = new ClassPathResource("db/20261026-03-modelo-portal-pagos.sql").getInputStream()) {
+        try (InputStream input = new ClassPathResource("db/20261102-01-migracion-consolidada.sql").getInputStream()) {
             script = new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
         jdbc.execute(probeDdl(script, "bank"));

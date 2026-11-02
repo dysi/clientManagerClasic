@@ -2,7 +2,7 @@ import { contextPath, request } from "../../services/http";
 import type { Payment } from "../../services/admin";
 export interface Actor { id: number; name: string }
 export interface LicenseOption {
-  id: number; companyId: number | null; companyName: string; revision: string; forcedLock: boolean;
+  id: number; companyId: number | null; companyName: string; revision: string; forcedLock: boolean; hidden: boolean;
   status: string; today: string; lockDate: string | null; suggestedDate: string;
 }
 export interface ReviewDetail {
@@ -18,12 +18,14 @@ export interface LicenseEvent { id: number; licenseId: number; companyName: stri
 export interface LicenseAction { licenseId: number; revision: string; unlock: boolean; updateExpiry: boolean; lockDate: string | null; confirmShortening: boolean }
 export interface PreviewLicense extends LicenseOption { unlock: boolean; updateExpiry: boolean; shortening: boolean; proposedDate: string | null; daysFromToday: number | null; differenceFromPrevious: number | null; resultingStatus: string }
 export interface ApprovalPreview { today: string; token: string; licenses: PreviewLicense[] }
+export interface ApprovalLicenses { today: string; suggestedDate: string; licenses: LicenseOption[] }
+export function approvalLicenses(id: number) { return request<ApprovalLicenses>(`/web/api/payments/${id}/approval-licenses`); }
 export function reviewDetail(id: number) { return request<ReviewDetail>(`/web/api/payments/${id}/detail`); }
 export function previewApproval(id: number, version: number, licenses: LicenseAction[]) {
-  return request<ApprovalPreview>(`/web/api/payments/${id}/approve-preview`, { method: "POST", body: JSON.stringify({ version, licenses }) });
+  return request<ApprovalPreview>(`/web/api/payments/${id}/approve-preview`, { method: "POST", body: JSON.stringify({ version, licenses, reviewAllLicenses: true }) });
 }
 export function approvePayment(id: number, version: number, licenses: LicenseAction[], preview: ApprovalPreview) {
-  return request<ReviewDetail>(`/web/api/payments/${id}/approve`, { method: "POST", body: JSON.stringify({ version, licenses, reviewedOn: preview.today, previewToken: preview.token }) });
+  return request<ReviewDetail>(`/web/api/payments/${id}/approve`, { method: "POST", body: JSON.stringify({ version, licenses, reviewAllLicenses: true, reviewedOn: preview.today, previewToken: preview.token }) });
 }
 export function rejectPayment(id: number, version: number, reason: string) {
   return request<ReviewDetail>(`/web/api/payments/${id}/reject`, { method: "POST", body: JSON.stringify({ version, reason }) });

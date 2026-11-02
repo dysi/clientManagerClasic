@@ -15,6 +15,9 @@ public class WebPaymentReviewController {
     private final PaymentReviewService service;
     public WebPaymentReviewController(PaymentReviewService service) { this.service = service; }
     @GetMapping("/detail") public PaymentReviewViews.Detail detail(@PathVariable Long id) { return service.detail(id); }
+    @GetMapping("/approval-licenses") public PaymentReviewViews.ApprovalLicenses approvalLicenses(@PathVariable Long id) {
+        return service.approvalLicenses(id);
+    }
     @GetMapping("/bank-accounts") public java.util.List<PaymentReviewViews.BankDestination> bankAccounts(@PathVariable Long id) {
         return service.bankAccounts(id);
     }

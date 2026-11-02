@@ -182,7 +182,7 @@ fechas y saldos con Soporte.
 ## Despliegue y verificación
 
 1. Aplicar primero en una copia MySQL compatible
-   `src/main/resources/db/20261028-01-sincronizacion-clientes-angrybox.sql`.
+   `src/main/resources/db/20261102-01-migracion-consolidada.sql`.
    Crea dos tablas y conserva saldos/clientes históricos; seguir sus precondiciones.
 2. Desplegar con empresa y reglas configuradas. Conviene iniciar con CODE_AND_DOCUMENT.
 3. Configurar en Angrybox una cuenta activa de integración con ROLE_API y habilitar

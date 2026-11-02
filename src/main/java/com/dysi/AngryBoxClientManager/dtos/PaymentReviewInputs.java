@@ -38,6 +38,7 @@ public final class PaymentReviewInputs {
     }
     public static class Options {
         @NotNull @PositiveOrZero public Long version;
+        public boolean reviewAllLicenses;
         @NotNull @Size(max = 100) @Valid public List<@NotNull LicenseAction> licenses = new ArrayList<>();
         // Accessors necesarios para errores de validación de elementos anidados.
         public List<LicenseAction> getLicenses() { return licenses; }
