@@ -33,12 +33,15 @@ public class WebSessionController {
     private final AuthenticationManager authenticationManager;
     private final PortalAccessService portal;
     private final DocumentLoginLimiter limiter;
+    private final com.dysi.AngryBoxClientManager.security.TurnstileService turnstile;
     private final com.dysi.AngryBoxClientManager.config.SupportContactProperties support;
 
     public WebSessionController(AuthenticationManager authenticationManager,
             PortalAccessService portal,
             DocumentLoginLimiter limiter,
+            com.dysi.AngryBoxClientManager.security.TurnstileService turnstile,
             com.dysi.AngryBoxClientManager.config.SupportContactProperties support) {
+        this.turnstile = turnstile;
         this.authenticationManager = authenticationManager;
         this.portal = portal;
         this.limiter = limiter; this.support = support;
@@ -51,6 +54,13 @@ public class WebSessionController {
         return Map.of("whatsappUrl", support.getWhatsappUrl());
     }
 
+    /** Solo configuración pública; nunca devuelve la clave secreta. */
+    @GetMapping("/turnstile")
+    public Map<String, Object> turnstile(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return Map.of("enabled", turnstile.isEnabled(), "siteKey", turnstile.getSiteKey());
+    }
+
     @GetMapping("/csrf")
     public Map<String, String> csrf(CsrfToken token, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
@@ -60,6 +70,7 @@ public class WebSessionController {
     @PostMapping("/login")
     public Map<String, Object> login(@Valid @RequestBody Credentials credentials,
             HttpServletRequest request, HttpServletResponse response) {
+        turnstile.verify(credentials.turnstileToken, "password_login");
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(credentials.username, credentials.password));
@@ -81,6 +92,7 @@ public class WebSessionController {
     public Map<String, Object> document(@Valid @RequestBody DocumentCredentials credentials,
             HttpServletRequest request, HttpServletResponse response) {
         limiter.check(request.getRemoteAddr());
+        turnstile.verify(credentials.turnstileToken, "document_login");
         PortalPrincipal principal =
                 portal.documentLogin(credentials.type, credentials.document);
         return establish(new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()), request, response);
@@ -118,11 +130,13 @@ public class WebSessionController {
     }
 
     public static class Credentials {
+        @Size(max = 2048) public String turnstileToken;
         @NotBlank @Size(max = 50) public String username;
         @NotBlank @Size(max = 200) public String password;
     }
 
     public static class DocumentCredentials {
+        @Size(max = 2048) public String turnstileToken;
         @NotNull public PortalAccessService.DocumentType type;
         @NotBlank @Size(max = 32) public String document;
     }

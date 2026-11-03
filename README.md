@@ -163,6 +163,7 @@ Todas las rutas siguientes son relativas al contexto del backend:
 | Método / ruta | Contrato |
 | --- | --- |
 | `GET /web/session/support` | Contacto público de WhatsApp configurado; disponible sin sesión |
+| `GET /web/session/turnstile` | Configuración pública de Turnstile (habilitado y site key), sin sesión |
 | `GET /web/session/csrf` | Prepara sesión y devuelve nombre de cabecera/token CSRF |
 | `POST /web/session/login` | Autentica, rota identificador de sesión y CSRF; no devuelve JWT |
 | `POST /web/session/document` | `{ "type": "DNI" o "CUIT", "document": "..." }`; sesión restringida, CSRF y límite de intentos |
@@ -182,7 +183,7 @@ La API administrativa exige `ROLE_ADMIN` en servidor. Las búsquedas limitan `si
 
 El navegador usa sesión HttpOnly, CSRF en escrituras y revalidación de la cuenta en cada petición. Deshabilitar una cuenta, cambiar roles o actualizar la contraseña desde la nueva API afecta a las sesiones existentes. La contraseña nueva debe tener al menos 12 caracteres y hasta 72 bytes UTF-8, por el límite de BCrypt. No se guarda un token de acceso en localStorage.
 
-La política CSP de `/ui` restringe scripts y conexiones al mismo origen, bloquea objetos y frames externos. Permite estilos inline porque PrimeVue genera estilos dinámicos; no permite scripts inline ni `unsafe-eval`. La interfaz no utiliza `v-html` para mostrar datos del servidor.
+La política CSP de `/ui` restringe los recursos al mismo origen y permite scripts, frames y conexiones de `https://challenges.cloudflare.com` para Turnstile; bloquea objetos y que otros sitios embeban el portal. Permite estilos inline porque PrimeVue genera estilos dinámicos; no permite scripts inline ni `unsafe-eval`. La interfaz no utiliza `v-html` para mostrar datos del servidor.
 
 Una segunda cadena de seguridad mantiene los consumidores Bearer/JWT existentes (`/auth`, `/refresh`, `/user`, `/api/...`). El refactor no supone una auditoría completa de esos contratos. Los servicios y endpoints anteriores conservados deben revisarse antes de ampliar su uso; la interfaz migrada no depende de ellos.
 
@@ -514,3 +515,32 @@ El cron se ejecuta diariamente a las 03:00 en esa zona. Elimina físicamente, en
 La IP se toma de `HttpServletRequest.getRemoteAddr()`: no se aceptan directamente `X-Forwarded-For` ni `Forwarded`. Si hay proxy, revisar y configurar su confianza en la infraestructura/Tomcat antes de interpretar el dato como IP del servidor AngryBox. NAT, VPN e IP dinámicas impiden usarla como identidad única; MAC y datos locales no son observables remotamente por este endpoint. Una copia puede conservar identificadores y credenciales. No hay bloqueo automático, activación por máquina ni latido periódico; el estado local de AngryBox sigue funcionando según sus reglas actuales.
 
 Antes de desplegar, aplicar manualmente `src/main/resources/db/20261102-02-bitacora-consultas-licencias.sql` sobre el esquema consolidado, primero en una copia MySQL compatible. Crea una tabla vacía con índices y referencias de auditoría sin cascadas; no reconstruye consultas anteriores. No se ejecuta automáticamente. La verificación aislada con H2 no acredita compatibilidad MySQL ni validación en producción.
+
+### Protección antibots del acceso público
+
+Los dos ingresos web (documento y contraseña) requieren Cloudflare Turnstile. El backend valida el token de un solo uso con Siteverify antes de autenticar y comprueba la acción (document_login/password_login) y el hostname contra una lista configurada. No envía DNI/CUIT ni contraseñas al proveedor. La API Bearer/JWT mantiene su contrato.
+
+Configuración inicial:
+
+1. Creá una cuenta en [Cloudflare](https://dash.cloudflare.com/) y abrí Turnstile → Add widget.
+2. Agregá los hostnames del portal (sin esquema, puerto ni ruta), elegí **Managed** y dejá pre-clearance deshabilitado. No necesitás cambiar DNS ni hosting.
+3. Configurá estas variables en el proceso que ejecuta Java:
+
+| Variable | Valor |
+| --- | --- |
+| CLIENTMANAGER_TURNSTILE_SITE_KEY | Site key pública del widget |
+| CLIENTMANAGER_TURNSTILE_SECRET_KEY | Secret key privada; guardarla fuera del repositorio |
+| CLIENTMANAGER_TURNSTILE_HOSTNAMES | Hostnames admitidos separados por comas, iguales a los configurados en Cloudflare |
+| CLIENTMANAGER_TURNSTILE_ENABLED | true por defecto; false por defecto con el perfil dev |
+
+Reiniciá el backend y recargá la página. La clave pública se obtiene de GET /web/session/turnstile, sin caché; no requiere recompilar Vue. La secreta nunca se devuelve al navegador. El servidor requiere salida HTTPS a challenges.cloudflare.com; el navegador también debe poder cargar sus scripts y frames. Revisá cualquier CSP adicional del proxy y la información de privacidad del portal para reflejar este proveedor.
+
+Sin claves o hostnames, con token inválido, vencido/reutilizado o ante falla del proveedor, no se concede acceso. El formulario conserva los datos y permite reintentar la verificación. Siteverify tiene timeout de conexión de 3 segundos y lectura de 5 segundos. El modo Managed se elige en Cloudflare, no desde el frontend.
+
+Para desactivar temporalmente Turnstile por un problema operativo, configurá `CLIENTMANAGER_TURNSTILE_ENABLED=false` o cambiá la propiedad general a `portal.turnstile.enabled=false` en una configuración externa. Reiniciá el backend y recargá el navegador. Esto permite ambos ingresos sin CAPTCHA ni claves y conserva CSRF, permisos y el límite de intentos por documento. Para reactivarlo, usá `true`, verificá las claves y hostnames, reiniciá y recargá. Si usás la variable de entorno, recordá que prevalece sobre el valor por defecto del placeholder.
+
+Para uso local, el perfil `dev` deshabilita Turnstile por defecto; la variable `CLIENTMANAGER_TURNSTILE_ENABLED=true` permite reactivarlo. Las cuatro propiedades de Turnstile están en `application-dev.properties`. En IntelliJ, agregá `--spring.profiles.active=dev` en **Program arguments** (o seleccioná `dev` en **Active profiles** si la configuración ofrece ese campo). También podés ejecutar `java -jar target/clientmanager-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev`. Este perfil conserva su configuración existente de SMTP, sincronización y base de datos; revisá la base de destino antes de iniciar.
+
+El perfil test deshabilita expresamente Turnstile para no depender de Internet. Para desarrollo local también podés probar el widget del frontend con las [claves oficiales de prueba](https://developers.cloudflare.com/turnstile/troubleshooting/testing/). La respuesta de ejemplo de Siteverify de prueba usa la acción `test`, que el backend rechaza deliberadamente: para verificar el flujo completo con las acciones reales usá un widget separado de desarrollo o una respuesta simulada de Siteverify en un harness aislado. Nunca usar claves de prueba en producción. Playwright también debe apuntar a un backend aislado con esta configuración explícita.
+
+Se conserva el límite del acceso por documento (por defecto 10 solicitudes por dirección remota cada 15 minutos), en memoria por instancia: se reinicia con el proceso y no se comparte entre servidores. Detrás de un proxy hay que verificar qué dirección recibe Java; no se confía directamente en cabeceras arbitrarias. Turnstile no acredita la titularidad del documento ni sustituye los permisos restringidos del portal. La validación real con el dominio y las claves definitivas debe completarse en el entorno de despliegue.

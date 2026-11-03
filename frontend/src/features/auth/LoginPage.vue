@@ -8,12 +8,16 @@ import Button from "primevue/button";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
 import SelectButton from "primevue/selectbutton";
+import TurnstileChallenge from "../../components/TurnstileChallenge.vue";
 import FormField from "../../components/FormField.vue";
 import { signIn, signInDocument } from "./session";
 import { returnPath } from "./navigation";
 const username = ref("");
 const password = ref("");
 const busy = ref(false);
+const verificationReady = ref(false);
+const turnstileToken = ref("");
+const challengeVersion = ref(0);
 const error = ref("");
 const help = ref(false);
 const props = withDefaults(defineProps<{ documentMode?: boolean }>(), { documentMode: false });
@@ -24,18 +28,21 @@ watch(documentType, () => { document.value = ""; error.value = ""; });
 const router = useRouter();
 const route = useRoute();
 async function submit() {
-  if (busy.value) return;
+  if (busy.value || !verificationReady.value) return;
   busy.value = true;
   error.value = "";
   try {
-    if (props.documentMode) await signInDocument(documentType.value, document.value);
-    else await signIn(username.value.trim(), password.value);
+    if (props.documentMode) await signInDocument(documentType.value, document.value, turnstileToken.value);
+    else await signIn(username.value.trim(), password.value, turnstileToken.value);
     password.value = "";
     await router.replace(returnPath(route.query.redirect, router));
   } catch (failure) {
     error.value =
       failure instanceof Error ? failure.message : "No se pudo iniciar sesión.";
   } finally {
+    verificationReady.value = false;
+    turnstileToken.value = "";
+    challengeVersion.value++;
     busy.value = false;
   }
 }
@@ -195,7 +202,14 @@ async function submit() {
                 />
               </FormField>
               </template>
+              <TurnstileChallenge
+                :key="String(documentMode) + ':' + challengeVersion"
+                :action="documentMode ? 'document_login' : 'password_login'"
+                @ready="verificationReady = $event"
+                @token="turnstileToken = $event"
+              />
               <Button
+                :disabled="!verificationReady"
                 type="submit"
                 :label="documentMode ? 'Ingresar al portal' : 'Iniciar sesión'"
                 icon="pi pi-arrow-right"
