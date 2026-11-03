@@ -56,9 +56,11 @@ class PortalAutoIncrementTests {
     }
 
     private String probeDdl(String script, String table) {
-        Matcher matcher = Pattern.compile("CREATE TABLE `" + table + "` \\([\\s\\S]*?\\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;").matcher(script);
+        Matcher matcher = Pattern.compile("CREATE TABLE `" + table + "` (\\([\\s\\S]*?\\)) ENGINE=InnoDB(?: ROW_FORMAT=DYNAMIC)? DEFAULT CHARSET=utf8mb4;").matcher(script);
         assertTrue(matcher.find(), "No se encontró el DDL de " + table);
-        return matcher.group().replace("`bank_account`", "`probe_bank_account`").replace("`bank`", "`probe_bank`")
+        // H2 verifica columnas y restricciones; ROW_FORMAT es una opción física exclusiva de MySQL.
+        return ("CREATE TABLE `" + table + "` " + matcher.group(1) + ";")
+                .replace("`bank_account`", "`probe_bank_account`").replace("`bank`", "`probe_bank`")
                 .replaceAll("CONSTRAINT (\\w+)", "CONSTRAINT probe_$1");
     }
     private long insert(String sql) {

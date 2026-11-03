@@ -1,4 +1,5 @@
--- Migracion consolidada para la integracion a develop: 11 scripts en orden original.
+-- Migracion consolidada: once secciones historicas, validaciones MySQL 5.7 y bitacora.
+-- Unico archivo para una base original sin migrar; no ejecutar por partes.
 -- Ejecucion manual UNA SOLA VEZ sobre el esquema previo al 26/10/2026, sin estas
 -- migraciones aplicadas ni columnas creadas por ddl-auto=update.
 -- Si la base ya esta parcial o totalmente migrada, NO ejecutar el archivo completo:
@@ -16,7 +17,7 @@
 
 -- Consolidado para MySQL 5.7.24: ejecutar SOLO en bases originales sin migrar.
 -- Sustituye la revision anterior para MySQL 8; no repetir sobre una copia ya migrada.
--- Para la copia ya migrada, revisar el esquema y usar únicamente el archivo 04.
+-- Para una base ya migrada, NO repetir: determinar los cambios pendientes por separado.
 -- Los CHECK se sustituyen por diez triggers al final; mantener la aplicación detenida
 -- hasta terminar todo el archivo. Requiere permisos TRIGGER además de DDL/rutinas.
 SELECT DATABASE() AS esquema_destino, VERSION() AS version_motor;
@@ -42,7 +43,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
         AND table_name IN ('bank','bank_account','client_account_balance','payment_status_history',
         'comment','attachment','payment_comment','payment_attachment','payment_license_action',
-        'angrybox_sync_state','angrybox_sync_batch','angrybox_payment_delivery','license_extension_certificate')) THEN
+        'angrybox_sync_state','angrybox_sync_batch','angrybox_payment_delivery','license_extension_certificate','license_query_log')) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Existen tablas nuevas: revisar migracion previa antes de cualquier borrado';
     END IF;
     SELECT COUNT(*) INTO legacy_fk_count
@@ -733,12 +734,11 @@ SELECT COUNT(*) AS huellas_iniciales FROM payment WHERE original_destination_has
 -- END 20261031-01-correccion-destino-bancario-pagos.sql
 
 
+-- BEGIN validaciones-portal-mysql57
 -- Compatibilidad MySQL 5.7.24: reemplazo efectivo de los CHECK ignorados por 5.7.
 -- Aplicar UNA SOLA VEZ sobre el modelo de portal ya creado; NO borra pagos ni altera columnas.
--- También se incluye al final de 20261102-01-migracion-consolidada.sql:
--- si se ejecutó ese consolidado nuevo, NO ejecutar este archivo por separado.
 -- Precondiciones: aplicación detenida, backup recuperable, InnoDB, IDs BIGINT con signo,
--- esquema seleccionado y secciones 01 a 11 del consolidado anterior terminadas.
+-- esquema seleccionado y secciones 01 a 11 de este archivo terminadas.
 -- No completa una migración parcial: revisar primero tablas/columnas y registro de errores.
 -- Requiere CREATE ROUTINE, EXECUTE y TRIGGER; con binlog pueden requerirse permisos adicionales.
 -- Probar primero en copia MySQL 5.7.24; no aplicar a una base compartida por esta entrega.
@@ -907,3 +907,60 @@ FROM information_schema.triggers WHERE trigger_schema=DATABASE() AND trigger_nam
 ('cm_client_bi','cm_client_bu','cm_bank_account_bi','cm_bank_account_bu',
 'cm_client_account_balance_bi','cm_client_account_balance_bu','cm_payment_bi','cm_payment_bu',
 'cm_payment_status_history_bi','cm_payment_status_history_bu') ORDER BY event_object_table, trigger_name;
+-- END validaciones-portal-mysql57
+
+-- BEGIN bitacora-consultas-licencias
+-- Bitácora de consultas de licencia v1/v2. Ejecución manual antes del arranque.
+-- Precondiciones: MySQL 5.7/8, InnoDB, esquema consolidado aplicado, tabla user con id BIGINT con signo.
+-- Probar primero sobre una copia compatible con backup verificado; no ejecutado en MySQL en esta entrega.
+-- Crea una tabla vacía, sin modificar licencias, usuarios ni datos históricos existentes.
+-- No atribuye eventos históricos ni reconstruye consultas anteriores al despliegue.
+-- El DDL hace COMMIT implícito: no hay rollback transaccional global.
+SELECT DATABASE() AS esquema_destino;
+SHOW CREATE TABLE user;
+
+CREATE TABLE license_query_log (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    received_at DATETIME(6) NOT NULL,
+    license_id BIGINT NULL,
+    company_id BIGINT NULL,
+    company_name VARCHAR(255) NULL,
+    authenticated_username VARCHAR(50) NULL,
+    requested_username VARCHAR(150) NULL,
+    remote_ip VARCHAR(64) NOT NULL,
+    user_agent VARCHAR(300) NULL,
+    http_method VARCHAR(16) NOT NULL,
+    api_version VARCHAR(2) NOT NULL,
+    http_status INT NOT NULL,
+    duration_ms BIGINT NOT NULL,
+    forced_lock BIT NULL,
+    lock_date_epoch_ms BIGINT NULL,
+    installation_id VARCHAR(100) NULL,
+    process_id VARCHAR(100) NULL,
+    hostname VARCHAR(255) NULL,
+    app_version VARCHAR(100) NULL,
+    operating_system VARCHAR(100) NULL,
+    creationdate DATETIME(6) NULL,
+    modificationdate DATETIME(6) NULL,
+    removedate DATETIME(6) NULL,
+    created_by_id BIGINT NULL,
+    modified_by_id BIGINT NULL,
+    removed_by_id BIGINT NULL,
+    KEY ix_license_query_received (received_at, id),
+    KEY ix_license_query_company (company_id, received_at),
+    KEY ix_license_query_license (license_id, received_at),
+    KEY ix_license_query_ip (remote_ip, received_at),
+    CONSTRAINT fk_license_query_created FOREIGN KEY (created_by_id) REFERENCES user(id),
+    CONSTRAINT fk_license_query_modified FOREIGN KEY (modified_by_id) REFERENCES user(id),
+    CONSTRAINT fk_license_query_removed FOREIGN KEY (removed_by_id) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- license_id y company_id son fotografías escalares sin FK: un intento puede no validar licencia.
+-- La purga programada elimina físicamente solo esta tabla, en lotes por received_at.
+-- Auditoría sin cascadas sobre user; no almacenar JWT, contraseñas ni cuerpos completos.
+SHOW CREATE TABLE license_query_log;
+SELECT COUNT(*) AS consultas_iniciales FROM license_query_log;
+-- Verificación operativa posterior al despliegue (esperado: cero filas):
+SELECT id FROM license_query_log
+WHERE received_at IS NULL OR http_status < 100 OR http_status > 599 OR duration_ms < 0;
+-- END bitacora-consultas-licencias

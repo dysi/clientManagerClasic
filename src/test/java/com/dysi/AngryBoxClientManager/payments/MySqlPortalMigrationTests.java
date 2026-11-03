@@ -42,7 +42,9 @@ class MySqlPortalMigrationTests {
             script(connection, "/db/20261102-01-migracion-consolidada.sql#20261026-03-modelo-portal-pagos.sql");
             script(connection, "/db/20261102-01-migracion-consolidada.sql#20261030-03-correccion-pagos-pendientes.sql");
             script(connection, "/db/20261102-01-migracion-consolidada.sql#20261031-01-correccion-destino-bancario-pagos.sql");
-            script(connection, "/db/20261102-04-validaciones-portal-mysql57.sql");
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#validaciones-portal-mysql57");
+            script(connection, "/db/20261102-01-migracion-consolidada.sql#bitacora-consultas-licencias");
+            assertEquals(0, count(connection, "license_query_log"));
             assertEquals(0, count(connection, "client_account_balance"));
             execute(connection, "INSERT INTO bank(id,name,normalized_name,active) VALUES (100,'Prueba','prueba',1)");
             execute(connection, "INSERT INTO bank_account(id,bank_id,holder,cbu,active) VALUES (101,100,'Titular','0000000000000000000000',1)");
@@ -76,7 +78,7 @@ class MySqlPortalMigrationTests {
             for (Class<?> type : List.of(User.class, Authority.class, Client.class, License.class, LicenseStatus.class,
                     Payment.class, Bank.class, BankAccount.class, ClientAccountBalance.class, Comment.class,
                     Attachment.class, PaymentComment.class, PaymentAttachment.class, PaymentStatusHistory.class,
-                    PaymentLicenseAction.class)) sources.addAnnotatedClass(type);
+                    PaymentLicenseAction.class, LicenseQueryLog.class)) sources.addAnnotatedClass(type);
             new SchemaValidator().validate(sources.buildMetadata(), registry);
         } finally { StandardServiceRegistryBuilder.destroy(registry); }
     }
