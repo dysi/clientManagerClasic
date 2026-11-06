@@ -7,6 +7,12 @@ import javax.validation.constraints.*;
 
 /** Contrato de entrega v1; solo incluye el destino bancario guardado en el pago, sin adjuntos ni comentarios privados. */
 public final class AngryboxPaymentSync {
+    /** Solo informa pendientes de revisión administrativa, sin entregar ni confirmar pagos. */
+    public static class PendingReview {
+        public int versionContrato = 1;
+        public long pendientesAuditar;
+    }
+
     public static class Matching {
         @NotNull
         public List<AngryboxClientSync.IncomingClient> clientes;

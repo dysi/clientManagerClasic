@@ -78,3 +78,20 @@ H2/HTTP con el ApiClient/orquestador de Angrybox. Incluye rollback de aprobació
 fallo de cola, páginas, fecha mínima por creación, matching, confirmaciones repetidas,
 interrupción antes de ACK y permisos. H2 no demuestra compatibilidad del SQL con MySQL;
 validar migración y recepción completa en una copia representativa antes de producción.
+
+
+### Consulta de pendientes de auditoría desde Angrybox
+
+GET `/api/payments/sync/review-pending?username=...&companyId=...` usa el mismo
+Bearer, permiso de integración y validación del origen que matching/pending/ack.
+Responde `{"versionContrato":1,"pendientesAuditar":3}`. El conteo incluye
+Payment con estado PENDIENTE y removeDate nulo, sin filtro de fecha de descarga.
+Es una consulta readOnly agregada en base de datos: no genera entregas, aprobaciones,
+confirmaciones, movimientos ni auditorías de escritura. No devuelve datos de clientes.
+
+No confundir con `/pending`, que entrega pagos ya APROBADO para incorporar en
+Angrybox. La pantalla Angrybox muestra círculo verde/Online cuando esta consulta
+funciona, rojo/Offline ante errores y No disponible en lugar de cero ante fallos.
+Con cantidad mayor que cero ofrece abrir la URL configurada en una nueva pestaña,
+para que un administrador ingrese a revisar. Requiere actualizar ambas aplicaciones;
+un ClientManager anterior sin esta ruta no podrá informar el estado en la barra.

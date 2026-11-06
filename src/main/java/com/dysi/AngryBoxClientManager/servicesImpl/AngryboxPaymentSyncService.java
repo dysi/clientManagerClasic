@@ -143,6 +143,17 @@ public class AngryboxPaymentSyncService {
         return page;
     }
 
+    /** Consulta liviana: PENDIENTE de auditoría no equivale a APROBADO pendiente de entrega. */
+    @Transactional(readOnly = true)
+    public PendingReview pendingReview(String username, Long companyId) {
+        access.authorizeIntegration(username, companyId);
+        PendingReview result = new PendingReview();
+        result.pendientesAuditar = em.createQuery(
+                "select count(p) from Payment p where p.status = :status and p.removeDate is null", Long.class)
+                .setParameter("status", PaymentStatus.PENDIENTE).getSingleResult();
+        return result;
+    }
+
     public void acknowledge(String username, Long companyId, Ack input) {
         access.authorizeIntegration(username, companyId);
         AngryboxPaymentDelivery delivery = em.find(AngryboxPaymentDelivery.class, input.paymentId, LockModeType.PESSIMISTIC_WRITE);

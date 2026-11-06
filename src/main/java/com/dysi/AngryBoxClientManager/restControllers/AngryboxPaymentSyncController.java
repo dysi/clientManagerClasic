@@ -31,6 +31,11 @@ public class AngryboxPaymentSyncController {
         return service.pending(username, companyId, after, until, desde);
     }
 
+    @GetMapping("/review-pending")
+    public PendingReview pendingReview(@RequestParam String username, @RequestParam Long companyId) {
+        return service.pendingReview(username, companyId);
+    }
+
     @PostMapping("/ack")
     public Map<String, Boolean> acknowledge(@RequestParam String username, @RequestParam Long companyId,
             @Valid @RequestBody Ack input) {

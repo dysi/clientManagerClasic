@@ -11,6 +11,7 @@ import AdminNavigation from "./components/AdminNavigation.vue";
 import { session, signOut } from "./features/auth/session";
 import { useConfirmAction } from "./composables/useConfirmAction";
 import { sessionHome, loginLocation } from "./features/auth/navigation";
+const brandLogo = `${import.meta.env.BASE_URL}icons/icon-96x96.png`;
 const route = useRoute();
 const router = useRouter();
 const confirm = useConfirmAction();
@@ -99,7 +100,7 @@ onUnmounted(() => {
           <RouterLink
             :to="sessionHome()"
             class="flex min-w-0 items-center gap-3 font-semibold text-primary"
-            ><i class="pi pi-building text-xl" aria-hidden="true" /><span
+            ><img :src="brandLogo" alt="" width="40" height="40" class="size-10 shrink-0" /><span
               >DySI
               <span :class="admin ? 'font-normal text-muted-color' : 'hidden font-normal text-muted-color sm:inline'"
                 >{{ admin ? 'Client Manager' : 'Portal de clientes' }}</span

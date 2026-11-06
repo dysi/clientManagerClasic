@@ -52,6 +52,8 @@ No existe una cuenta de demostración ni bootstrap de administrador. La base deb
 
 La configuración heredada contiene valores de conexión y secreto que deben sustituirse mediante configuración externa y rotarse si se utilizaron. Este documento no reproduce sus valores. `ddl-auto=update` puede modificar el esquema al arrancar; validar primero una copia del entorno y usar `SPRING_JPA_HIBERNATE_DDLAUTO=validate` cuando corresponda. Los cambios de base se versionan como scripts MySQL manuales en `src/main/resources/db/`; no se ejecutan automáticamente.
 
+Los iconos de Client Manager se sirven localmente desde `frontend/public/icons/`: logo de cabecera y bienvenida, favicon ICO/PNG y acceso directo Apple. Sus rutas respetan la base relativa de Vite y el contexto de despliegue.
+
 ## Navegación y bienvenida
 
 - Abrir `http://localhost:3000/` redirige a la aplicación, conservando el contexto `/clientmanager` y las URLs de las integraciones existentes. Si el despliegue usa otro contexto, la entrada se adapta a esa configuración.
@@ -443,7 +445,7 @@ El listado muestra saldo externo en ARS y última sincronización. Permite filtr
 
 El acceso por DNI/CUIT oculta Datos de tu cuenta, Estado general, Mis licencias y la columna Detalle de pagos. El saldo ocupa todo el ancho disponible cuando no se muestra Estado general. El servidor también omite el estado general, los contadores de licencias, documentos y contacto en el resumen, no precarga el teléfono en el formulario y rechaza con 403 la consulta de licencias, detalles, comentarios y comprobantes por URL directa. El formulario permite informar pagos y adjuntar comprobantes nuevos sin consultar las licencias existentes. El ingreso con usuario y contraseña conserva las consultas completas del propietario.
 
-Mis pagos informados muestra únicamente emisiones entre la fecha/hora local actual del servidor menos 45 días y el momento actual, con filtro y paginación en base de datos. La columna Archivos Adjuntos cuenta los vínculos y archivos no anulados, incluidos agregados posteriores, sin exponer sus metadatos. El saldo muestra «Informado:» junto a su fecha y se retira la descripción anterior. Estos cambios no alteran el esquema ni requieren migración SQL.
+Mis pagos informados muestra emisiones desde la fecha/hora comercial actual menos 45 días (inclusive), sin fecha hasta, con filtro y paginación en base de datos. Usa `portal.review.time-zone` (por defecto `America/Argentina/Buenos_Aires`), sin depender de la zona predeterminada de la JVM. Las emisiones posteriores al reloj actual también se incluyen. La columna Archivos Adjuntos cuenta los vínculos y archivos no anulados, incluidos agregados posteriores, sin exponer sus metadatos. El saldo muestra «Informado:» junto a su fecha y se retira la descripción anterior. Estos cambios no alteran el esquema ni requieren migración SQL.
 
 Verificación de privacidad: `clean verify` correcto con Java 11, pruebas Java sobre H2 y pruebas frontend existentes. Se revisaron ambos modos en escritorio (1440 px) y móvil (390 px) con respuestas sintéticas, comprobando visibilidad y ausencia de desborde de página. No se ejecutó la prueba opcional de migración MySQL ni se modificaron datos compartidos.
 

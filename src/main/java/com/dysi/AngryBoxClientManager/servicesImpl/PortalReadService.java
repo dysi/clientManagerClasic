@@ -8,6 +8,7 @@ import com.dysi.AngryBoxClientManager.storage.PortalFileProperties;
 import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -28,12 +29,15 @@ public class PortalReadService {
     private final PaymentCommentRepository comments;
     private final PortalFileProperties limits;
     private final PaymentAttachmentRepository attachments;
+    private final ZoneId paymentZone;
 
     public PortalReadService(PortalAccessService access, ClientRepository clients, LicenseRepository licenses,
             BankAccountRepository accounts, ClientAccountBalanceRepository balances, PaymentRepository payments,
-            PaymentStatusHistoryRepository histories, PaymentCommentRepository comments, PortalFileProperties limits, PaymentAttachmentRepository attachments) {
+            PaymentStatusHistoryRepository histories, PaymentCommentRepository comments, PortalFileProperties limits, PaymentAttachmentRepository attachments,
+            @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String paymentZone) {
         this.access = access; this.clients = clients; this.licenses = licenses; this.accounts = accounts;
         this.balances = balances; this.payments = payments; this.histories = histories; this.comments = comments; this.limits = limits; this.attachments = attachments;
+        this.paymentZone = ZoneId.of(paymentZone);
     }
 
     public PortalViews.Overview overview(PortalPrincipal principal) {
@@ -108,10 +112,11 @@ public class PortalReadService {
 
     public Page<PortalViews.Payment> payments(PortalPrincipal principal, int page, int size) {
         Long clientId = access.revalidate(principal).getClientId();
-        LocalDateTime now = LocalDateTime.now();
+        // Solo límite inferior: un desfase de reloj no debe ocultar pagos recién informados.
+        LocalDateTime desde = LocalDateTime.now(paymentZone).minusDays(45);
         Page<Payment> results = payments.findAll((Specification<Payment>) (root, query, cb) -> cb.and(
                 cb.equal(root.get("client").get("id"), clientId), cb.isNull(root.get("removeDate")),
-                cb.between(root.get("issuedAt"), now.minusDays(45), now)),
+                cb.greaterThanOrEqualTo(root.<LocalDateTime>get("issuedAt"), desde)),
                 PageRequest.of(page(page, size, "id").getPageNumber(), size, Sort.by(Sort.Direction.DESC, "id")));
         List<Long> ids = results.stream().map(Payment::getId).collect(Collectors.toList());
         Map<Long, String> rejectionReasons = ids.isEmpty() ? Map.of() : histories.findByPaymentIdInAndNewStatus(ids, PaymentStatus.RECHAZADO)

@@ -12,6 +12,7 @@ import TurnstileChallenge from "../../components/TurnstileChallenge.vue";
 import FormField from "../../components/FormField.vue";
 import { signIn, signInDocument } from "./session";
 import { returnPath } from "./navigation";
+const brandLogo = `${import.meta.env.BASE_URL}icons/icon-96x96.png`;
 const username = ref("");
 const password = ref("");
 const busy = ref(false);
@@ -69,10 +70,7 @@ async function submit() {
         />
       </div>
       <div class="flex items-center gap-3">
-        <span
-          class="flex size-11 items-center justify-center rounded-xl border border-white/20 bg-white/10"
-          ><i class="pi pi-building text-xl" aria-hidden="true"
-        /></span>
+        <img :src="brandLogo" alt="" width="44" height="44" class="size-11 shrink-0" />
         <div>
           <p class="text-2xl font-semibold tracking-tight">
             DySI<span class="text-primary-300">.</span>
