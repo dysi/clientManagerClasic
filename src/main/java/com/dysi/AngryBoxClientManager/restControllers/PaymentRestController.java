@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -16,7 +17,7 @@ import com.dysi.AngryBoxClientManager.dtos.LicensePaymentsPaginationDTO;
 import com.dysi.AngryBoxClientManager.dtos.PaymentDTO;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.License;
-import com.dysi.AngryBoxClientManager.models.Payment;
+import com.dysi.AngryBoxClientManager.dtos.AdminViews.PaymentView;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.LicenseService;
 import com.dysi.AngryBoxClientManager.services.PaymentService;
@@ -32,6 +33,7 @@ public class PaymentRestController {
     private PaymentService paymentService;
     
     @RequestMapping("/payments/paginated")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<LicensePaymentsPaginationDTO> getPaymentsPaginated(
             @RequestParam(value = "username", required = true) String username,
             @RequestParam(value = "companyId", required = true) Long companyId,
@@ -51,12 +53,15 @@ public class PaymentRestController {
             }
 
             return new ResponseEntity<LicensePaymentsPaginationDTO>(lppDTO, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<LicensePaymentsPaginationDTO>(HttpStatus.FORBIDDEN);
         }
     }
     
     @RequestMapping("/payments/licenses")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<List<License>> getLicenses(
             @RequestParam(value = "clientID", required = true) Long clientID) {
         try {
@@ -64,12 +69,15 @@ public class PaymentRestController {
             List<License> licenses = this.licenseService.getLicensesFromClient(client);
 
             return new ResponseEntity<List<License>>(licenses, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<List<License>>(HttpStatus.BAD_REQUEST);
         }
     }
     
-    @RequestMapping("/payments/licenciaBloquear")
+    @RequestMapping(value = "/payments/licenciaBloquear", method = RequestMethod.POST)
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> licenciaBloquear(
     		@RequestParam(value = "licenciaID", required = true) Long licenciaID) {
     	String resultado = "";
@@ -77,25 +85,31 @@ public class PaymentRestController {
         	resultado = this.licenseService.licenciaBloquear(licenciaID);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
         	return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
     }
     
     @RequestMapping("/payments/paymentsByLicense")
-    public ResponseEntity<List<Payment>> getPaymentsPaginatedByCompany(
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<List<PaymentView>> getPaymentsPaginatedByCompany(
             @RequestParam(value = "licenseId", required = true) Long licenseId) {
         try {
             
-        	List<Payment> payments = this.paymentService.getLicensePayments(licenseId);
+            List<PaymentView> payments = this.paymentService.getLicensePayments(licenseId);
 
-            return new ResponseEntity<List<Payment>>(payments, HttpStatus.OK);
+            return new ResponseEntity<List<PaymentView>>(payments, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
-            return new ResponseEntity<List<Payment>>(HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<List<PaymentView>>(HttpStatus.BAD_REQUEST);
         }
     }
     
     @RequestMapping(value = "/payments/paymentEdit", method = RequestMethod.POST)
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> paymentEdit(
     		@RequestBody LicenseDTO license) {
         try {
@@ -103,12 +117,15 @@ public class PaymentRestController {
         	String resultado = this.licenseService.editLicencia(license);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
     }
     
     @RequestMapping(value = "/payments/licenseEdit", method = RequestMethod.POST)
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> licenseEdit(
     		@RequestBody PaymentDTO Payment) {
         try {
@@ -116,12 +133,15 @@ public class PaymentRestController {
         	String resultado = this.paymentService.editPayment(Payment);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }
     }
     
-    @RequestMapping("/payments/bajaPago")
+    @RequestMapping(value = "/payments/bajaPago", method = RequestMethod.POST)
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> bajaPago(
     		@RequestParam(value = "pagoID", required = true) Long pagoID) {
     	String resultado = "";
@@ -129,6 +149,8 @@ public class PaymentRestController {
         	resultado = this.paymentService.pagoBaja(pagoID);
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
         	return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
         }

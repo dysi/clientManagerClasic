@@ -1,6 +1,7 @@
 package com.dysi.AngryBoxClientManager.servicesImpl;
 
 import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
+import com.dysi.AngryBoxClientManager.dtos.ClientLookup;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.repositories.ClientRepository;
@@ -8,6 +9,7 @@ import com.dysi.AngryBoxClientManager.repositories.UserRepository;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,41 +39,62 @@ public class ClientServiceImpl implements ClientService {
 				ClientDTO cDTO = new ClientDTO(c.getId(), c.getFirstname(), c.getLastname(), c.getEmail(), c.getPhone(),
 						c.getCuil(), (c.getUser() != null ? c.getUser().getUsername() : "SIN ASIGNAR"));
 				clientsDTO.add(cDTO);
+                cDTO.setLegalName(c.getLegalName()); cDTO.setTradeName(c.getTradeName());
+                cDTO.setExternalCode(c.getExternalCode());
 			}
 		}
 
 		return clientsDTO;
 	}
+	
+	@Override
+	public List<ClientLookup> getClientsLookups(String keyword, Integer statusId, Integer daysToLock) {
+		if(keyword != null) {
+			if(keyword.trim().length() == 0) {
+				keyword = null;
+			} else {
+				keyword = ("%" + keyword.trim() + "%");
+			}
+		}
+
+		if(statusId == null) {
+			statusId = -1;
+		}
+		if(daysToLock == null) {
+			daysToLock = 15;
+		}
+				
+		Calendar dateMax = Calendar.getInstance();
+		dateMax.add(Calendar.DAY_OF_MONTH, daysToLock);
+		
+		
+		List<ClientLookup> clientsDTO = this.clientRepository.findAllLookupFilter(keyword, statusId, Calendar.getInstance(), dateMax);
+		return clientsDTO;
+	}
 
 	@Override
 	public Client getClientByID(Long clientID) {
-		return this.clientRepository.findOne(clientID);
+		return this.clientRepository.findById(clientID).orElse(null);
 	}
 
 	@Override
 	public String editClient(ClientDTO clientEdit) {
 		Client cliente = new Client();
 
-		if (clientEdit.getIdOld() > 0) {
+		if (clientEdit.getIdOld() != null && clientEdit.getIdOld() > 0) {
 			// EDICION Y ID CLIENTE SE MANTIENE
-			cliente = this.clientRepository.findOne(clientEdit.getIdOld());
+			cliente = this.clientRepository.findById(clientEdit.getIdOld())
+                    .orElseThrow(() -> new IllegalArgumentException("No se encontró el cliente."));
 		}
-		// else {
-		// //NUEVO
-		// Client clienteExiste =
-		// this.clientRepository.findOne(clientEdit.getId());
-		// if(clienteExiste != null){
-		// return ("99|EL ID YA ESTA EN USO: #" + clienteExiste.getId() + ". " +
-		// clienteExiste.getFirstname() + " " + clienteExiste.getLastname());
-		// }
-		// cliente.setId(clientEdit.getId());
-		// }
 
-		cliente.setLastname(clientEdit.getLastname().trim());
-		cliente.setFirstname(clientEdit.getFirstname().trim());
-		cliente.setCuil(clientEdit.getCuil().trim());
-		cliente.setPhone(clientEdit.getPhone().trim());
-		cliente.setEmail(clientEdit.getEmail().trim());
+		cliente.setLastname(clientEdit.getLastname() != null ? clientEdit.getLastname().trim() : "");
+		cliente.setFirstname(clientEdit.getFirstname() != null ? clientEdit.getFirstname().trim() : "");
+		if (clientEdit.getCuil() != null) cliente.setCuil(clientEdit.getCuil().trim());
+		if (clientEdit.getPhone() != null) cliente.setPhone(clientEdit.getPhone().trim());
+		if (clientEdit.getEmail() != null) cliente.setEmail(clientEdit.getEmail().trim());
+        if (clientEdit.getLegalName() != null) cliente.setLegalName(clientEdit.getLegalName());
+        if (clientEdit.getTradeName() != null) cliente.setTradeName(clientEdit.getTradeName());
+        if (clientEdit.getExternalCode() != null) cliente.setExternalCode(clientEdit.getExternalCode());
 
 		cliente = this.clientRepository.saveAndFlush(cliente);
 

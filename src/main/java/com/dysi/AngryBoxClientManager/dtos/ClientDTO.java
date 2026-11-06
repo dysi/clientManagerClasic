@@ -1,6 +1,12 @@
 package com.dysi.AngryBoxClientManager.dtos;
 
 public class ClientDTO {
+
+    public ClientDTO(Long id, String firstname, String lastname, String email, String phone, String cuil,
+            String username, String legalName, String tradeName, String externalCode) {
+        this(id, firstname, lastname, email, phone, cuil, username);
+        this.legalName = legalName; this.tradeName = tradeName; this.externalCode = externalCode;
+    }
 	
 	public ClientDTO(Long id, String firstname, String lastname, String email, String phone, String cuil, String username) {
 		super();
@@ -11,6 +17,7 @@ public class ClientDTO {
 		this.phone = phone;
 		this.cuil = cuil;
 		this.username = (username != null ? username : "SIN ASIGNAR");
+		this.portalUserMissing = username == null;
 	}
 	
 	public ClientDTO() {
@@ -26,6 +33,22 @@ public class ClientDTO {
     private String email;
     private String phone;
     private String cuil;
+    private String dni;
+    private String legalName;
+    private String tradeName;
+    private String externalCode;
+
+    public String getLegalName() { return legalName; }
+    public void setLegalName(String legalName) { this.legalName = legalName; }
+    public String getTradeName() { return tradeName; }
+    public void setTradeName(String tradeName) { this.tradeName = tradeName; }
+    public String getExternalCode() { return externalCode; }
+    public void setExternalCode(String externalCode) { this.externalCode = externalCode; }
+    private boolean portalUserMissing;
+
+    public String getDni() { return dni; }
+    public void setDni(String dni) { this.dni = dni; }
+    public boolean isPortalUserMissing() { return portalUserMissing; }
     
     private String username;
     

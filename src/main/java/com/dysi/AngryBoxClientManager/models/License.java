@@ -7,25 +7,44 @@ import java.util.Calendar;
 import java.util.List;
 
 @Entity
-public class License {
+@Table(name = "LICENSE", uniqueConstraints = @UniqueConstraint(name = "uk_license_client", columnNames = { "ID", "CLIENT_ID" }))
+public class License extends AuditableEntity {
+	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
+    
+    @Column(name = "DESCRIPTION")
     private String description;
 
+    @Column(name = "COMPANYNAME")
     private String companyName;
+    
+    @Column(name = "COMPANYID")
     private Long companyId;
 
     // inicio de actividad
+    @Column(name = "INITIALACTIVITY")
     private Calendar initialActivity;
+    
     // pago por adelantado
+    @Column(name = "PREPAYMENT")
     private boolean prePayment;
+
+    // Visibilidad independiente del bloqueo y la baja.
+    @Column(name = "HIDDEN", nullable = false)
+    private boolean hidden;
+
+    @JsonIgnore
+    public boolean isHidden() { return hidden; }
+    public void setHidden(boolean hidden) { this.hidden = hidden; }
 
     @ManyToOne
     private Client client;
 
-    @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)
+    // Evidencias con ciclo de vida independiente de la licencia.
+    @OneToMany(mappedBy = "license")
     List<Payment> paymentList;
 
     @OneToMany(mappedBy = "license", cascade=CascadeType.ALL, orphanRemoval=true)

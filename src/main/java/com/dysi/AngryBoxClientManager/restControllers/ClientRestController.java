@@ -1,16 +1,21 @@
 package com.dysi.AngryBoxClientManager.restControllers;
 
 import com.dysi.AngryBoxClientManager.dtos.ClientDTO;
+import com.dysi.AngryBoxClientManager.dtos.ClientLookup;
+import com.dysi.AngryBoxClientManager.dtos.UserCreateDTO;
 import com.dysi.AngryBoxClientManager.models.Client;
 import com.dysi.AngryBoxClientManager.models.License;
+import com.dysi.AngryBoxClientManager.models.User;
 import com.dysi.AngryBoxClientManager.services.ClientService;
 import com.dysi.AngryBoxClientManager.services.LicenseService;
+import com.dysi.AngryBoxClientManager.services.UserService;
 
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -22,9 +27,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClientRestController {
 
     @Autowired
+    private com.dysi.AngryBoxClientManager.servicesImpl.LicenseExtensionService extensions;
+    @Autowired
     private ClientService clientService;
     @Autowired
     private LicenseService licenseService;
+    @Autowired
+    private UserService userService;
 
     /**
      * COMUNICACION CON ANGRYBOX (Bloqueo de Cuenta)
@@ -33,10 +42,10 @@ public class ClientRestController {
      * @return
      */
     @RequestMapping("/clients/license")
-    public ResponseEntity<License> getLicenseFromClient(
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_USER','ROLE_SELLER')")
+    public ResponseEntity<?> getLicenseFromClient(
             @RequestParam(value = "username", required = true) String username,
-            @RequestParam(value = "companyId", required = true) Long companyId
-    ) {
+            @RequestParam(value = "companyId", required = true) Long companyId) {
         try {
             Client client = this.clientService.getClientFromUser(username);
             License license = this.licenseService.getLicenseFromClient(client, companyId);
@@ -44,13 +53,15 @@ public class ClientRestController {
                 return new ResponseEntity<License>(license, HttpStatus.NOT_FOUND);
             }
 
-            return new ResponseEntity<License>(license, HttpStatus.OK);
+            com.fasterxml.jackson.databind.node.ObjectNode response = extensions.licenseResponse(client, license);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return new ResponseEntity<License>(HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<License>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     
     @RequestMapping("/clients/getClients")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<List<ClientDTO>> getClients() {
         try {
             List<ClientDTO> client = this.clientService.getClients();
@@ -60,11 +71,31 @@ public class ClientRestController {
 
             return new ResponseEntity<List<ClientDTO>>(client, HttpStatus.OK);
         } catch (Exception e) {
-        	return new ResponseEntity<List<ClientDTO>>(HttpStatus.BAD_REQUEST);
+        	return new ResponseEntity<List<ClientDTO>>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    @RequestMapping("/clients/getClientsLookups")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<List<ClientLookup>> getClientsLookups(
+    		@RequestParam(value = "keyword", required = false) String keyword,
+    		@RequestParam(value = "statusId", required = false) Integer statusId,
+    		@RequestParam(value = "daysToLock", required = false) Integer daysToLock
+    		) {
+        try {
+            List<ClientLookup> clients = this.clientService.getClientsLookups(keyword, statusId, daysToLock);
+            if (clients == null) {
+                return new ResponseEntity<List<ClientLookup>>(clients, HttpStatus.NOT_FOUND);
+            }
+
+            return new ResponseEntity<List<ClientLookup>>(clients, HttpStatus.OK);
+        } catch (Exception e) {
+        	return new ResponseEntity<List<ClientLookup>>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     
     @RequestMapping(value = "/clients/edit", method = RequestMethod.POST)
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> editClient(
     		@RequestBody ClientDTO client) {
         try {
@@ -73,7 +104,27 @@ public class ClientRestController {
 
             return new ResponseEntity<String>(resultado, HttpStatus.OK);
         } catch (Exception e) {
-            return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<String>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    /**
+     * COMUNICACION CON ANGRYBOX (Bloqueo de Cuenta)
+     * @param username
+     * @param companyId
+     * @return
+     */
+    @RequestMapping(value = "/users/edit", method = RequestMethod.POST)
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<String> editUser(
+    		@RequestBody UserCreateDTO userCreateDTO) {
+        try {
+        	
+        	User userEdit = this.userService.editUser(userCreateDTO);
+
+            return new ResponseEntity<String>("1|Usuario " + userEdit.getUsername() + " Creado", HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<String>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

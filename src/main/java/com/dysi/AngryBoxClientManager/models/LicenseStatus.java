@@ -6,21 +6,25 @@ import javax.persistence.*;
 import java.util.Calendar;
 
 @Entity
-public class LicenseStatus {
+@Table(name = "LICENSESTATUS")
+public class LicenseStatus extends AuditableEntity {
+	
     @Id
     @Column(name = "ID")
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
-
-    // fecha baja
-    private Calendar removeDate;
-    // fecha cracion
-    private Calendar creationDate;
+    @Column(name = "OBSERVATION")
     private String observation;
+    
+    @Column(name = "LIMITTRANSACTION")
     private Long limitTransaction;
+    
     // blockeo forzado
+    @Column(name = "FORCEDLOCK")
     private boolean forcedLock;
+    
     // fecha bloqueo
+    @Column(name = "LOCKDATE")
     private Calendar lockDate;
 
     @ManyToOne
@@ -32,22 +36,6 @@ public class LicenseStatus {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public Calendar getRemoveDate() {
-        return removeDate;
-    }
-
-    public void setRemoveDate(Calendar removeDate) {
-        this.removeDate = removeDate;
-    }
-
-    public Calendar getCreationDate() {
-        return creationDate;
-    }
-
-    public void setCreationDate(Calendar creationDate) {
-        this.creationDate = creationDate;
     }
 
     public String getObservation() {

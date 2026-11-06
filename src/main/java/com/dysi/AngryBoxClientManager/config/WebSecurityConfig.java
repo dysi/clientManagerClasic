@@ -3,13 +3,14 @@ package com.dysi.AngryBoxClientManager.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +22,7 @@ import com.dysi.AngryBoxClientManager.security.JwtAuthenticationTokenFilter;
 
 @SuppressWarnings("SpringJavaAutowiringInspection")
 @Configuration
+@Order(2)
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
@@ -32,10 +34,19 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     private UserDetailsService userDetailsService;
 
     @Autowired
-    public void configureAuthentication(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
+    private com.dysi.AngryBoxClientManager.security.LicenseQueryLogFilter licenseQueryLogFilter;
+
+    @Override
+    protected void configure(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
         authenticationManagerBuilder
                 .userDetailsService(this.userDetailsService)
                 .passwordEncoder(passwordEncoder());
+    }
+
+    @Bean
+    @Override
+    public AuthenticationManager authenticationManagerBean() throws Exception {
+        return super.authenticationManagerBean();
     }
 
     @Bean
@@ -48,11 +59,22 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         return new JwtAuthenticationTokenFilter();
     }
 
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthenticationTokenFilter> jwtFilterRegistration(
+            JwtAuthenticationTokenFilter filter) {
+        org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthenticationTokenFilter> registration =
+                new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+        // Register only in the Bearer security chain, never as a global servlet filter.
+        registration.setEnabled(false);
+        return registration;
+    }
+
     @Override
     protected void configure(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
-                // we don't need CSRF because our token is invulnerable
+                // This fallback chain is exclusively for stateless Bearer clients.
                 .csrf().disable()
+                .logout().disable()
 
                 .exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
 
@@ -60,26 +82,13 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
 
                 .authorizeRequests()
-                //.antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                // allow anonymous resource requests
-                .antMatchers(
-                        HttpMethod.GET,
-                        "/",
-                        "/*.html",
-                        "/favicon.ico",
-                        "/**/*.html",
-                        "/**/*.css",
-                        "/**/*.js" ,
-                        "/**/*.png"
-                ).permitAll()
-                .antMatchers("/auth","/auth/**", "/users/login","/users/create/**","/users/edit/**", "/css/**", "/index/**", "/redirect-to").permitAll()
-                //.antMatchers("/**").permitAll()
+                .antMatchers("/auth", "/auth/**").permitAll()
                 .anyRequest().authenticated();
 
         // Custom JWT based security filter
         httpSecurity
                 .addFilterBefore(authenticationTokenFilterBean(), UsernamePasswordAuthenticationFilter.class);
+        httpSecurity.addFilterBefore(licenseQueryLogFilter, JwtAuthenticationTokenFilter.class);
 
         // disable page caching
         httpSecurity.headers().cacheControl();

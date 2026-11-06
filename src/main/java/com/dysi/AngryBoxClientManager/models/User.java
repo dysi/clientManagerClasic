@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "USER")
-public class User {
+public class User extends AuditableEntity {
 
     @Id
     @Column(name = "ID")
@@ -125,6 +125,7 @@ public class User {
 
     public void setAuthorities(List<Authority> authorities) {
         this.authorities = authorities;
+        markModified();
     }
 
     public Date getLastPasswordResetDate() {
