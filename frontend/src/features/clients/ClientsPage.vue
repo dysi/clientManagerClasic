@@ -139,8 +139,22 @@ async function changeStatus(client: Client) {
               :severity="data.removed ? 'danger' : 'success'" />
           </template>
         </Column>
-        <Column header="CUIT"><template #body="{ data }">{{ data.cuil || "—" }}</template></Column>
-        <Column header="DNI"><template #body="{ data }">{{ data.dni || "—" }}</template></Column>
+        <Column header="CUIT/DNI"><template #body="{ data }">
+          <p v-if="data.cuil">CUIT: {{ data.cuil }}</p><p v-if="data.dni">DNI: {{ data.dni }}</p>
+          <span v-if="!data.cuil && !data.dni">—</span>
+        </template></Column>
+        <Column header="Dirección"><template #body="{ data }">
+          <div class="min-w-48 max-w-80 whitespace-normal break-words">
+            <p v-if="data.street || data.streetNumber">{{ [data.street, data.streetNumber].filter(Boolean).join(' ') }}</p>
+            <p v-if="data.addressComplement">{{ data.addressComplement }}</p>
+            <p v-if="data.neighborhood">Barrio / Sector: {{ data.neighborhood }}</p>
+            <p>{{ [data.city, data.provinceName, data.countryName].filter(Boolean).join(', ') }}</p>
+            <p v-if="data.postalCode">CP: {{ data.postalCode }}</p>
+          </div>
+        </template></Column>
+        <Column header="Observaciones"><template #body="{ data }">
+          <p v-if="data.observations" class="min-w-48 max-w-80 whitespace-pre-wrap break-words">{{ data.observations }}</p>
+        </template></Column>
         <Column field="email" header="Correo" class="hidden md:table-cell" />
         <Column field="phone" header="Teléfono" class="hidden lg:table-cell" />
         <Column header="Deuda / saldo">

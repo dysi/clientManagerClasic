@@ -54,6 +54,59 @@ public class Client extends AuditableEntity {
     public String getExternalCode() { return externalCode; }
     public void setExternalCode(String externalCode) { this.externalCode = optionalText(externalCode); }
 
+    @Column(name = "STREET", length = 255)
+    @javax.validation.constraints.Size(max = 255)
+    private String street;
+    public String getStreet() { return street; }
+    public void setStreet(String value) { this.street = optionalText(value); }
+
+    @Column(name = "STREET_NUMBER", length = 30)
+    @javax.validation.constraints.Size(max = 30)
+    private String streetNumber;
+    public String getStreetNumber() { return streetNumber; }
+    public void setStreetNumber(String value) { this.streetNumber = optionalText(value); }
+
+    @Column(name = "ADDRESS_COMPLEMENT", length = 255)
+    @javax.validation.constraints.Size(max = 255)
+    private String addressComplement;
+    public String getAddressComplement() { return addressComplement; }
+    public void setAddressComplement(String value) { this.addressComplement = optionalText(value); }
+
+    @Column(name = "NEIGHBORHOOD", length = 255)
+    @javax.validation.constraints.Size(max = 255)
+    private String neighborhood;
+    public String getNeighborhood() { return neighborhood; }
+    public void setNeighborhood(String value) { this.neighborhood = optionalText(value); }
+
+    @Column(name = "CITY", length = 255)
+    @javax.validation.constraints.Size(max = 255)
+    private String city;
+    public String getCity() { return city; }
+    public void setCity(String value) { this.city = optionalText(value); }
+
+    @Column(name = "POSTAL_CODE", length = 30)
+    @javax.validation.constraints.Size(max = 30)
+    private String postalCode;
+    public String getPostalCode() { return postalCode; }
+    public void setPostalCode(String value) { this.postalCode = optionalText(value); }
+
+    @Column(name = "OBSERVATIONS", length = 4000)
+    @javax.validation.constraints.Size(max = 4000)
+    private String observations;
+    public String getObservations() { return observations; }
+    public void setObservations(String value) { this.observations = optionalText(value); }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "COUNTRY_ID")
+    @JsonIgnore private Country country;
+    @JsonIgnore public Country getCountry() { return country; }
+    public void setCountry(Country value) { this.country = value; }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "PROVINCE_ID")
+    @JsonIgnore private Province province;
+    @JsonIgnore public Province getProvince() { return province; }
+    public void setProvince(Province value) { this.province = value; }
+
     private static String optionalText(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
     }

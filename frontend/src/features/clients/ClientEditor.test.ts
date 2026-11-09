@@ -1,5 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import PrimeVue from "primevue/config";
 import ToastService from "primevue/toastservice";
 vi.mock("../../composables/useConfirmAction", () => ({
@@ -8,6 +8,27 @@ vi.mock("../../composables/useConfirmAction", () => ({
 import ClientEditor from "./ClientEditor.vue";
 import { clientsApi, type Client } from "./api";
 import { ApiError } from "../../services/http";
+
+beforeEach(() => {
+  // APIs de layout usadas por PrimeVue que jsdom no implementa.
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  });
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
+  }));
+  vi.spyOn(clientsApi, "countries").mockResolvedValue([{ id: 19, name: "Argentina", countryId: null }]);
+  vi.spyOn(clientsApi, "provinces").mockResolvedValue([{ id: 83, name: "Mendoza", countryId: 19 }]);
+});
 
 const client: Client = {
   removed: false,
@@ -47,6 +68,8 @@ describe("Edición de clientes", () => {
     const save = vi.spyOn(clientsApi, "save").mockResolvedValue(client);
     const wrapper = editor();
     await wrapper.get("#lastname").setValue("Gómez");
+    await wrapper.get("#street").setValue("Calle de prueba");
+    await wrapper.get("#observations").setValue("Recibir por la tarde");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
     expect(save).toHaveBeenCalledWith(
@@ -60,6 +83,15 @@ describe("Edición de clientes", () => {
         legalName: "",
         tradeName: "",
         externalCode: "",
+        street: "Calle de prueba",
+        streetNumber: "",
+        addressComplement: "",
+        neighborhood: "",
+        city: "",
+        postalCode: "",
+        observations: "Recibir por la tarde",
+        countryId: 0,
+        provinceId: 0,
       },
       7,
     );

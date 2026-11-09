@@ -73,6 +73,15 @@ onMounted(async () => {
               <dt class="text-sm text-muted-color">Usuario vinculado</dt>
               <dd class="mt-2">{{ client.username }}</dd>
             </div>
+<div v-if="client.street"><dt class="text-sm text-muted-color">Calle</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.street }}</dd></div>
+<div v-if="client.streetNumber"><dt class="text-sm text-muted-color">Número</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.streetNumber }}</dd></div>
+<div v-if="client.addressComplement"><dt class="text-sm text-muted-color">Interior / Piso / Departamento / Oficina</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.addressComplement }}</dd></div>
+<div v-if="client.neighborhood"><dt class="text-sm text-muted-color">Barrio / Sector</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.neighborhood }}</dd></div>
+<div v-if="client.city"><dt class="text-sm text-muted-color">Ciudad / Localidad</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.city }}</dd></div>
+<div v-if="client.countryName"><dt class="text-sm text-muted-color">País</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.countryName }}</dd></div>
+<div v-if="client.provinceName"><dt class="text-sm text-muted-color">Provincia</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.provinceName }}</dd></div>
+<div v-if="client.postalCode"><dt class="text-sm text-muted-color">Código postal</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.postalCode }}</dd></div>
+<div v-if="client.observations"><dt class="text-sm text-muted-color">Observaciones</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.observations }}</dd></div>
           </dl></template
         ></Card
       >

@@ -28,7 +28,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + ", '0', ''), '1', ''), '2', ''), '3', ''), '4', ''),"
             + " '5', ''), '6', ''), '7', ''), '8', ''), '9', '')";
 
-    @Query(value = "select c from Client c left join fetch c.user u left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
+    @Query(value = "select c from Client c left join fetch c.user u left join fetch c.country left join fetch c.province left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
             + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
             + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
