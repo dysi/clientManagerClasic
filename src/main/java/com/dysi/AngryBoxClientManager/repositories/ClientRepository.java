@@ -80,7 +80,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     @Query("select c.id from Client c where "
             + "((:type = 'CUIT' and " + NORMALIZED_CUIT + " = :document) "
             + "or (:type = 'DNI' and ((length(c.dni) > 0 and function('lpad', c.dni, 8, '0') = :dni) "
-            + "or (length(" + NORMALIZED_CUIT + ") = 11 and length(" + CUIT_WITHOUT_DIGITS + ") = 0 "
+            + "or ((c.dni is null or length(trim(c.dni)) = 0) and length(" + NORMALIZED_CUIT + ") = 11 and length(" + CUIT_WITHOUT_DIGITS + ") = 0 "
             + "and substring(" + NORMALIZED_CUIT + ", 3, 8) = :dni))))")
     List<Long> findPortalDocumentMatches(@Param("type") String type, @Param("document") String document,
             @Param("dni") String dni, org.springframework.data.domain.Pageable pageable);

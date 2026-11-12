@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Card from "primevue/card";
 import InputText from "primevue/inputtext";
@@ -7,7 +7,6 @@ import Password from "primevue/password";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
-import SelectButton from "primevue/selectbutton";
 import TurnstileChallenge from "../../components/TurnstileChallenge.vue";
 import FormField from "../../components/FormField.vue";
 import { signIn, signInDocument } from "./session";
@@ -22,10 +21,7 @@ const challengeVersion = ref(0);
 const error = ref("");
 const help = ref(false);
 const props = withDefaults(defineProps<{ documentMode?: boolean }>(), { documentMode: false });
-const documentType = ref<"DNI" | "CUIT">("DNI");
 const document = ref("");
-const documentTypes = ["DNI", "CUIT"];
-watch(documentType, () => { document.value = ""; error.value = ""; });
 const router = useRouter();
 const route = useRoute();
 async function submit() {
@@ -33,7 +29,7 @@ async function submit() {
   busy.value = true;
   error.value = "";
   try {
-    if (props.documentMode) await signInDocument(documentType.value, document.value, turnstileToken.value);
+    if (props.documentMode) await signInDocument(document.value, turnstileToken.value);
     else await signIn(username.value.trim(), password.value, turnstileToken.value);
     password.value = "";
     await router.replace(returnPath(route.query.redirect, router));
@@ -152,17 +148,11 @@ async function submit() {
                 error
               }}</Message>
               <template v-if="documentMode">
-                <div class="flex flex-col gap-2">
-                  <span id="document-type-label" class="font-medium">Tipo de documento</span>
-                  <SelectButton v-model="documentType" :options="documentTypes" :allow-empty="false"
-                    :disabled="busy" aria-labelledby="document-type-label" />
-                </div>
-                <FormField id="document" :label="documentType" required v-slot="field"
-                  :hint="documentType === 'DNI' ? 'Hasta ocho dígitos; podés usar puntos.' : 'Once dígitos; podés usar guiones.'">
+                <FormField id="document" label="DNI o CUIT" required v-slot="field"
+                  hint="DNI de ocho dígitos o CUIT de once dígitos. Podés usar puntos o guiones.">
                   <InputText id="document" v-model="document" inputmode="numeric" autocomplete="off"
-                    :placeholder="documentType === 'DNI' ? '12.345.678' : '20-12345678-9'"
-                    :pattern="documentType === 'DNI' ? '[0-9 .\\-]{1,14}' : '[0-9 .\\-]{11,18}'"
-                    :maxlength="documentType === 'DNI' ? 14 : 18" required :disabled="busy"
+                    placeholder="Ingresá tu DNI o CUIT"
+                    pattern="[0-9 .\-]{8,18}" maxlength="18" required :disabled="busy"
                     :aria-describedby="field.describedby" fluid />
                 </FormField>
               </template>

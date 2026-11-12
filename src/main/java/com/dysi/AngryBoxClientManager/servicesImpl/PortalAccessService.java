@@ -32,10 +32,13 @@ public class PortalAccessService {
     public PortalPrincipal documentLogin(DocumentType type, String value) {
         // Solo se aceptan separadores conocidos; nunca descartar letras silenciosamente.
         if (value == null || !value.matches("[0-9 .-]+")) invalidDocument();
-        String document = value.replaceAll("[ .-]", "");
-        if (type == null || !document.matches(type == DocumentType.DNI ? "[0-9]{1,8}" : "[0-9]{11}")) {
+        String document = ClientDocumentValidation.normalize(value);
+        // La longitud determina el tipo, incluso si un consumidor anterior aún lo envía.
+        type = document.length() == 8 ? DocumentType.DNI : document.length() == 11 ? DocumentType.CUIT : null;
+        if (type == null || !document.matches(type == DocumentType.DNI ? "[0-9]{8}" : "[0-9]{11}")) {
             invalidDocument();
         }
+        if (type == DocumentType.CUIT && !ClientDocumentValidation.validCuit(value)) invalidDocument();
         String dni = type == DocumentType.DNI ? String.format("%8s", document).replace(' ', '0') : "";
         List<Long> matches = clients.findPortalDocumentMatches(type.name(), document, dni, PageRequest.of(0, 2));
         if (matches.size() != 1) throw denied();
@@ -94,7 +97,7 @@ public class PortalAccessService {
     }
 
     private void invalidDocument() {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Revisá el tipo y formato del documento.");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingresá un DNI de ocho dígitos o un CUIT válido de once dígitos.");
     }
 
     private ResponseStatusException denied() {

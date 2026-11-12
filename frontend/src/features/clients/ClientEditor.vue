@@ -6,6 +6,7 @@ import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
+import { clientCuitError } from "../../services/documents";
 import FormField from "../../components/FormField.vue";
 import { useDraft } from "../../composables/useDraft";
 import { clientDraft, clientsApi, emptyClient, type Client, type ClientInput, type Place } from "./api";
@@ -62,7 +63,9 @@ const contactFields: TextField[] = [
   { id: "postalCode", label: "Código Postal (CP)", max: 30 },
 ];
 const { dirty, saving, error, fields, reset, save, discard } = useDraft(form);
+const cuitError = computed(() => clientCuitError(form.value.cuil, form.value.dni));
 async function submit() {
+  if (cuitError.value) return;
   const result = await save(() =>
     clientsApi.save(form.value, props.client?.id),
   );
@@ -81,7 +84,7 @@ defineExpose({ changed: dirty, saving });
         <template #subtitle>Los campos con * son obligatorios.</template>
         <template #content><div class="grid gap-5 sm:grid-cols-2">
           <FormField v-for="item in mainFields" :key="item.id" :id="item.id" :label="item.label"
-            :required="item.required" :error="fields[item.id]" v-slot="field">
+            :required="item.required" :error="item.id === 'cuil' ? cuitError || fields.cuil : fields[item.id]" v-slot="field">
             <InputText :id="item.id" v-model="form[item.id]" :maxlength="item.max" :required="item.required"
               :inputmode="item.id === 'dni' ? 'numeric' : undefined" :pattern="item.id === 'dni' ? '[0-9]{0,8}' : undefined"
               :disabled="saving" :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
@@ -91,7 +94,7 @@ defineExpose({ changed: dirty, saving });
       <Card><template #title>Contacto y dirección</template>
         <template #content><div class="grid gap-5 sm:grid-cols-2">
           <FormField v-for="item in contactFields" :key="item.id" :id="item.id" :label="item.label"
-            :error="fields[item.id]" v-slot="field">
+            :error="item.id === 'cuil' ? cuitError || fields.cuil : fields[item.id]" v-slot="field">
             <InputText :id="item.id" v-model="form[item.id]" :type="item.type || 'text'" :maxlength="item.max"
               :disabled="saving" :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
           </FormField>

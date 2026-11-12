@@ -32,11 +32,11 @@ export async function signIn(username: string, password: string, turnstileToken:
   await refreshCsrf();
 }
 
-export async function signInDocument(type: "DNI" | "CUIT", document: string, turnstileToken: string) {
+export async function signInDocument(document: string, turnstileToken: string) {
   await refreshCsrf();
   session.user = await request<SessionUser>("/web/session/document", {
     method: "POST",
-    body: JSON.stringify({ type, document, turnstileToken }),
+    body: JSON.stringify({ document, turnstileToken }),
   });
   await refreshCsrf();
 }

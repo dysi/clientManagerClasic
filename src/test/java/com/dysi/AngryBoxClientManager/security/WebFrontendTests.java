@@ -211,7 +211,7 @@ class WebFrontendTests {
     @Test void clientRoundTripPreservesContactAndRejectsPartialEdits() throws Exception {
         account(AuthorityName.ROLE_ADMIN);
         Browser browser = login();
-        String body = "{\"firstname\":\"Ana\",\"lastname\":\"Pérez\",\"email\":\"ana@example.test\",\"phone\":\"123456\",\"cuil\":\"20123456789\"}";
+        String body = "{\"firstname\":\"Ana\",\"lastname\":\"Pérez\",\"email\":\"ana@example.test\",\"phone\":\"123456\",\"cuil\":\"20123456786\"}";
         MvcResult created = mvc.perform(post("/web/api/clients").session(browser.session)
                 .header(browser.header, browser.token).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(header().exists("Location")).andReturn();
@@ -221,7 +221,7 @@ class WebFrontendTests {
                 .header(browser.header, browser.token).contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("Pérez", "Gómez")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.phone").value("123456"))
-                .andExpect(jsonPath("$.email").value("ana@example.test")).andExpect(jsonPath("$.cuil").value("20123456789"));
+                .andExpect(jsonPath("$.email").value("ana@example.test")).andExpect(jsonPath("$.cuil").value("20123456786"));
         mvc.perform(get("/web/api/clients").session(browser.session).param("keyword", "Gómez"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
         mvc.perform(put("/web/api/clients/" + id).session(browser.session)
@@ -239,7 +239,7 @@ class WebFrontendTests {
     @Test void userRoleCannotAdministerAndDisabledAccountLosesSession() throws Exception {
         User user = account(AuthorityName.ROLE_USER);
         Client client = new Client(); client.setFirstname("Portal"); client.setLastname("Prueba");
-        client.setDni("1234567"); client.setCuil("20-01234567-9"); client.setUser(user);
+        client.setDni("1234567"); client.setCuil("20-01234567-5"); client.setUser(user);
         clients.saveAndFlush(client); user.setClient(client); users.saveAndFlush(user);
         Browser browser = login();
         mvc.perform(get("/web/session").session(browser.session)).andExpect(jsonPath("$.access").value("PORTAL"));
@@ -252,9 +252,9 @@ class WebFrontendTests {
         Authority admin = new Authority(); admin.setName(AuthorityName.ROLE_ADMIN); authorities.saveAndFlush(admin);
         user.setAuthorities(new java.util.ArrayList<>(List.of(admin))); users.saveAndFlush(user);
         mvc.perform(post("/web/session/document").session(browser.session).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"type\":\"DNI\",\"document\":\"1.234.567\"}")).andExpect(status().isForbidden());
+                .content("{\"document\":\"1.234.567\"}")).andExpect(status().isForbidden());
         mvc.perform(post("/web/session/document").session(browser.session).header(browser.header, browser.token)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"CUIT\",\"document\":\"20-01234567-9\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"document\":\"20-01234567-5\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.roles[0]").value("PORTAL_VIEW"))
                 .andExpect(jsonPath("$.origin").value("PORTAL_DOCUMENTO"));
         mvc.perform(get("/web/api/banks").session(browser.session)).andExpect(status().isForbidden());
@@ -269,14 +269,14 @@ class WebFrontendTests {
                 .andReturn().getResponse().getContentAsString());
         mvc.perform(post("/web/session/document").session(browser.session)
                 .header(token.get("headerName").asText(), token.get("token").asText())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"DNI\",\"document\":\"1234567\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"document\":\"01234567\"}"))
                 .andExpect(status().isOk());
         Client ambiguous = new Client(); ambiguous.setDni("01234567"); clients.saveAndFlush(ambiguous);
         token = json.readTree(mvc.perform(get("/web/session/csrf").session(browser.session))
                 .andReturn().getResponse().getContentAsString());
         mvc.perform(post("/web/session/document").session(browser.session)
                 .header(token.get("headerName").asText(), token.get("token").asText())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"DNI\",\"document\":\"1234567\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"document\":\"01234567\"}"))
                 .andExpect(status().isUnauthorized());
         user.setEnabled(false); users.saveAndFlush(user);
         mvc.perform(get("/web/session").session(browser.session)).andExpect(status().isUnauthorized());

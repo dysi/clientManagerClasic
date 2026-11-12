@@ -23,9 +23,12 @@ public class WebPortalController {
     private final PortalAccessService access;
     private final PortalReadService read;
     private final PortalPaymentService payments;
+    private final com.dysi.AngryBoxClientManager.servicesImpl.LicenseExtensionService extensions;
     private final com.dysi.AngryBoxClientManager.servicesImpl.ReceiptAccessService receipts;
-    public WebPortalController(PortalAccessService access, PortalReadService read, PortalPaymentService payments, com.dysi.AngryBoxClientManager.servicesImpl.ReceiptAccessService receipts) {
+    public WebPortalController(PortalAccessService access, PortalReadService read, PortalPaymentService payments, com.dysi.AngryBoxClientManager.servicesImpl.ReceiptAccessService receipts,
+            com.dysi.AngryBoxClientManager.servicesImpl.LicenseExtensionService extensions) {
         this.access = access; this.read = read; this.payments = payments; this.receipts = receipts;
+        this.extensions = extensions;
     }
 
     @GetMapping("/context")
@@ -38,6 +41,11 @@ public class WebPortalController {
 
     @GetMapping("/overview") @PreAuthorize("hasAuthority('PORTAL_VIEW')")
     public PortalViews.Overview overview(@AuthenticationPrincipal PortalPrincipal principal) { return read.overview(principal); }
+
+    @PostMapping("/license-extension") @PreAuthorize("hasAuthority('PORTAL_SUBMIT')")
+    public PortalViews.Extension extension(@AuthenticationPrincipal PortalPrincipal principal) {
+        return extensions.request(principal);
+    }
 
     @GetMapping("/licenses") @PreAuthorize("hasAuthority('PORTAL_VIEW')")
     public Page<PortalViews.License> licenses(@AuthenticationPrincipal PortalPrincipal principal,

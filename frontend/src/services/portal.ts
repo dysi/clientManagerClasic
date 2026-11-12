@@ -45,12 +45,27 @@ export interface PortalPayment {
 }
 export interface PortalComment { id: number; text: string; occurredAt: string }
 export interface PortalOverview {
+  extension: PortalExtension;
   sensitiveAccess: boolean;
   client: { firstname: string | null; lastname: string | null; email: string | null; phone: string | null; dni: string | null; cuil: string | null };
   name: string;
   state: "SIN_LICENCIAS" | "CON_RESTRICCIONES" | "REVISAR_DATOS" | "POR_VENCER" | "VIGENTE" | null;
   balance: null | { amount: number; currency: string; state: "DEUDA" | "A_FAVOR" | "SIN_DEUDA"; synchronizedAt: string };
   licenses: { total: number; blocked: number; expired: number; expiring: number; unknown: number } | null;
+}
+export interface PortalExtension {
+  active: boolean;
+  eligible: boolean;
+  expiredLicenses: boolean;
+  reason: string | null;
+  message: string | null;
+  origin: "PAYMENT" | "CLIENT_REQUEST" | null;
+  durationDays: number;
+  expiresAt: string | null;
+  expiresOn: string | null;
+}
+export function requestLicenseExtension() {
+  return request<PortalExtension>("/web/portal/license-extension", { method: "POST" });
 }
 export interface PaymentFormContext { sensitiveAccess: boolean; accounts: PortalAccount[]; suggestedAmount: number | null; contactPhone: string | null; maxReceipts: number; maxFileBytes: number }
 export interface PortalSubmission {

@@ -74,7 +74,7 @@ test("administración completa con formularios separados y sesión segura", asyn
     .getByLabel("Correo electrónico", { exact: true })
     .fill("ana.e2e@example.test");
   await page.getByLabel("Teléfono", { exact: true }).fill("3415551234");
-  await page.getByLabel("CUIL / CUIT", { exact: true }).fill("20123456789");
+  await page.getByLabel("CUIL / CUIT", { exact: true }).fill("20123456786");
   await page.getByRole("button", { name: "Guardar cliente" }).click();
   await expect(heading("Ana E2E Verificación")).toBeVisible();
   await link("Editar datos").click();

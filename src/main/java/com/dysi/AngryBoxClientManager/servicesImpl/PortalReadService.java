@@ -30,20 +30,23 @@ public class PortalReadService {
     private final PortalFileProperties limits;
     private final PaymentAttachmentRepository attachments;
     private final ZoneId paymentZone;
+    private final LicenseExtensionService extensions;
 
     public PortalReadService(PortalAccessService access, ClientRepository clients, LicenseRepository licenses,
             BankAccountRepository accounts, ClientAccountBalanceRepository balances, PaymentRepository payments,
             PaymentStatusHistoryRepository histories, PaymentCommentRepository comments, PortalFileProperties limits, PaymentAttachmentRepository attachments,
-            @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String paymentZone) {
+            @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String paymentZone, LicenseExtensionService extensions) {
         this.access = access; this.clients = clients; this.licenses = licenses; this.accounts = accounts;
         this.balances = balances; this.payments = payments; this.histories = histories; this.comments = comments; this.limits = limits; this.attachments = attachments;
         this.paymentZone = ZoneId.of(paymentZone);
+        this.extensions = extensions;
     }
 
     public PortalViews.Overview overview(PortalPrincipal principal) {
         Long clientId = access.revalidate(principal).getClientId();
         Client client = clients.findById(clientId).orElseThrow(this::missing);
         PortalViews.Overview view = new PortalViews.Overview();
+        view.extension = extensions.overview(clientId);
         view.name = client.getFirstname() == null ? "Cliente" : client.getFirstname();
         view.client = new PortalViews.ClientIdentity();
         view.client.firstname = client.getFirstname(); view.client.lastname = client.getLastname();

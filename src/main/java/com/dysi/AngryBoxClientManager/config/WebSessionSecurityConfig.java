@@ -47,7 +47,7 @@ public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
                         "/web/portal/accounts", "/web/portal/payment-form", "/web/portal/payments",
                         "/web/portal/payments/*/comments", "/web/portal/payments/*", "/web/portal/payments/*/attachments",
                         "/web/portal/payments/*/attachments/*").hasAuthority("PORTAL_VIEW")
-                .antMatchers(HttpMethod.POST, "/web/portal/payments", "/web/portal/payments/*/attachments").hasAuthority("PORTAL_SUBMIT")
+                .antMatchers(HttpMethod.POST, "/web/portal/payments", "/web/portal/payments/*/attachments", "/web/portal/license-extension").hasAuthority("PORTAL_SUBMIT")
                 .antMatchers(HttpMethod.POST, "/web/portal/payments/*/comments").hasAuthority("PORTAL_COMMENT")
                 .antMatchers("/web/portal/**").denyAll()
                 .antMatchers("/web/api/**", "/index/**", "/users/create/**", "/users/edit/**").hasRole("ADMIN")

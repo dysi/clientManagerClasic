@@ -11,10 +11,28 @@ import { displayDateTime, money } from "../../services/format";
 import { overviewLabels, type PortalOverview } from "../../services/portal";
 import PortalLicenses from "./PortalLicenses.vue";
 import PortalPayments from "./PortalPayments.vue";
+import PortalExtension from "./PortalExtension.vue";
+import type { PortalExtension as Extension } from "../../services/portal";
 const overview = ref<PortalOverview | null>(null);
 const licensesCollapsed = ref(true);
 const error = ref("");
 const loading = ref(true);
+let refreshPending = false;
+let extensionRevision = 0;
+async function refreshExtension() {
+  if (refreshPending) return;
+  refreshPending = true;
+  const revision = extensionRevision;
+  try {
+    const result = await request<PortalOverview>("/web/portal/overview");
+    if (overview.value && revision === extensionRevision) overview.value.extension = result.extension;
+  } catch { /* La siguiente actualización o solicitud vuelve a comprobar el estado en servidor. */ }
+  finally { refreshPending = false; }
+}
+function updateExtension(extension: Extension) {
+  extensionRevision++;
+  if (overview.value) overview.value.extension = extension;
+}
 onMounted(async () => {
   try { overview.value = await request<PortalOverview>("/web/portal/overview"); }
   catch (failure) { error.value = failure instanceof Error ? failure.message : "No se pudo abrir el portal."; }
@@ -26,6 +44,7 @@ onMounted(async () => {
   <Message v-else-if="error" severity="error" role="alert">{{ error }}</Message>
   <template v-else-if="overview">
     <PageHeader :title="'Cuenta de ' + ([overview.client.firstname, overview.client.lastname].filter(Boolean).join(' ') || overview.name)" description="Revisá los datos de tu cuenta y consultá tus pagos y saldo informado." />
+    <PortalExtension :extension="overview.extension" @updated="updateExtension" @refresh="refreshExtension" />
     <Card v-if="overview.sensitiveAccess" class="mb-6"><template #title>Datos de tu cuenta</template><template #content>
       <dl class="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div><dt class="text-sm text-muted-color">DNI</dt><dd class="break-all">{{ overview.client.dni || 'Sin registrar' }}</dd></div>

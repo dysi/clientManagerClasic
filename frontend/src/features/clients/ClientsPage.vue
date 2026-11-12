@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import Select from "primevue/select";
-import { money, displayDateTime } from "../../services/format";
 import Button from "primevue/button";
 import Card from "primevue/card";
-import DataTable from "primevue/datatable";
-import Column from "primevue/column";
+import Skeleton from "primevue/skeleton";
+import ClientCard from "./ClientCard.vue";
 import Message from "primevue/message";
-import Tag from "primevue/tag";
 import PageHeader from "../../components/PageHeader.vue";
 import ListToolbar from "../../components/ListToolbar.vue";
 import ListPaginator from "../../components/ListPaginator.vue";
@@ -38,9 +36,6 @@ const syncOptions = [
 ];
 const { rows, keyword, loading, error, page, size, total, search, paginate, load } =
   usePagedList<Client>("/web/api/clients", () => ({ status: status.value, balanceState: balanceState.value, staleDays: staleDays.value || null }));
-function clientRowClass(client: Client) {
-  return client.removed ? "bg-red-100! hover:bg-red-200!" : undefined;
-}
 async function changeStatus(client: Client) {
   if (acting.value != null) return;
   const removed = !client.removed;
@@ -96,107 +91,30 @@ async function changeStatus(client: Client) {
       <p v-if="staleDays" class="mb-4 text-sm text-muted-color">
         Solo saldos informados con más de {{ staleDays }} días sin sincronizar. Combiná con «Con deuda» para revisar deudas.
       </p>
-      <div class="min-w-0 overflow-x-auto">
-      <DataTable
-        :value="rows"
-        :table-style="{ minWidth: '48rem' }"
-        :loading="loading"
-        data-key="id"
-        row-hover
-        :row-class="clientRowClass"
-        striped-rows
-        scrollable
-      >
-        <template #empty
-          >No se encontraron clientes. Probá otra búsqueda o creá un
-          cliente.</template
-        >
-        <Column header="Cliente"
-          ><template #body="{ data }"
-            ><RouterLink
-              :to="`/clients/${data.id}`"
-              class="font-medium text-primary"
-              >{{ data.lastname }}, {{ data.firstname }}</RouterLink
-            >
-            <p v-if="data.tradeName" class="mt-1 break-words text-sm">{{ data.tradeName }}</p>
-            <p v-if="data.legalName" class="mt-1 break-words text-sm text-muted-color">{{ data.legalName }}</p>
-            <p class="mt-1 text-sm text-muted-color">
-              #{{ data.id }} ·
-              {{
-                data.username === "SIN ASIGNAR"
-                  ? "Sin usuario vinculado"
-                  : data.username
-              }}
-            </p>
-            <p v-if="data.portalUserMissing" class="mt-1 text-sm text-orange-700 dark:text-orange-300">
-              <i class="pi pi-exclamation-triangle" aria-hidden="true" /> Sin acceso al portal: vinculá un usuario.
-            </p></template
-          ></Column
-        >
-        <Column header="Estado">
-          <template #body="{ data }">
-            <Tag :value="data.removed ? 'Dado de baja' : 'Activo'"
-              :severity="data.removed ? 'danger' : 'success'" />
-          </template>
-        </Column>
-        <Column header="CUIT/DNI"><template #body="{ data }">
-          <p v-if="data.cuil">CUIT: {{ data.cuil }}</p><p v-if="data.dni">DNI: {{ data.dni }}</p>
-          <span v-if="!data.cuil && !data.dni">—</span>
-        </template></Column>
-        <Column header="Dirección"><template #body="{ data }">
-          <div class="min-w-48 max-w-80 whitespace-normal break-words">
-            <p v-if="data.street || data.streetNumber">{{ [data.street, data.streetNumber].filter(Boolean).join(' ') }}</p>
-            <p v-if="data.addressComplement">{{ data.addressComplement }}</p>
-            <p v-if="data.neighborhood">Barrio / Sector: {{ data.neighborhood }}</p>
-            <p>{{ [data.city, data.provinceName, data.countryName].filter(Boolean).join(', ') }}</p>
-            <p v-if="data.postalCode">CP: {{ data.postalCode }}</p>
-          </div>
-        </template></Column>
-        <Column header="Observaciones"><template #body="{ data }">
-          <p v-if="data.observations" class="min-w-48 max-w-80 whitespace-pre-wrap break-words">{{ data.observations }}</p>
-        </template></Column>
-        <Column field="email" header="Correo" class="hidden md:table-cell" />
-        <Column field="phone" header="Teléfono" class="hidden lg:table-cell" />
-        <Column header="Deuda / saldo">
-          <template #body="{ data }">
-            <template v-if="data.accountBalance">
-              <p class="whitespace-nowrap font-medium">{{ money(data.accountBalance.amount) }}</p>
-              <p class="text-sm text-muted-color">{{ data.accountBalance.amount > 0 ? "Deuda" : data.accountBalance.amount < 0 ? "Saldo a favor" : "Sin deuda" }}</p>
-              <p class="mt-1 whitespace-nowrap text-sm text-muted-color">
-                Sincronizado: {{ displayDateTime(data.accountBalance.synchronizedAt) }}
-              </p>
-            </template>
-            <span v-else class="text-muted-color">Sin informar</span>
-          </template>
-        </Column>
-        <Column header="Acciones"
-          ><template #body="{ data }"
-            ><div class="flex flex-wrap gap-1">
-              <Button
-                as="router-link"
-                :to="`/clients/${data.id}`"
-                label="Ver detalle"
-                text
-                size="small"
-                :aria-label="`Ver detalle de ${data.firstname} ${data.lastname}`"
-              /><Button
-                as="router-link"
-                :to="`/clients/${data.id}/edit`"
-                icon="pi pi-pencil"
-                text
-                size="small"
-                :aria-label="`Editar cliente ${data.id}`"
-              /><Button type="button" :label="data.removed ? 'Dar de alta' : 'Dar de baja'"
-                :severity="data.removed ? 'secondary' : 'danger'" text size="small"
-                :loading="acting === data.id" :disabled="acting != null" @click="changeStatus(data)" /></div></template
-        ></Column>
-      </DataTable>
-      </div>
-      <ListPaginator
-        :page="page"
-        :size="size"
-        :total="total"
-        @change="paginate"
-      /> </template
-  ></Card>
+    </template>
+  </Card>
+  <section class="mt-6 min-w-0" aria-label="Resultados de clientes" :aria-busy="loading">
+    <p class="mb-4 text-sm text-muted-color" role="status">
+      <template v-if="loading">Buscando clientes…</template>
+      <template v-else>{{ total }} {{ total === 1 ? 'cliente encontrado' : 'clientes encontrados' }} · Todos los datos disponibles en cada tarjeta.</template>
+    </p>
+    <div v-if="loading" class="space-y-5" aria-hidden="true">
+      <Card v-for="item in 3" :key="item"><template #content>
+        <Skeleton width="45%" height="1.75rem" class="mb-5" />
+        <Skeleton height="8rem" />
+      </template></Card>
+    </div>
+    <Message v-else-if="!rows.length && !error" severity="info" :closable="false">
+      No se encontraron clientes. Probá otra búsqueda o creá un cliente.
+    </Message>
+    <div v-else-if="!loading" class="space-y-5">
+      <ClientCard v-for="client in rows" :key="client.id" :client="client"
+        :acting="acting === client.id" :actions-disabled="acting != null"
+        @change-status="changeStatus(client)" />
+    </div>
+    <Button v-if="error" type="button" label="Reintentar búsqueda" icon="pi pi-refresh"
+      outlined class="mt-4" :disabled="loading" @click="load" />
+    <ListPaginator v-if="!loading && total > 0" class="mt-5"
+      :page="page" :size="size" :total="total" @change="paginate" />
+  </section>
 </template>

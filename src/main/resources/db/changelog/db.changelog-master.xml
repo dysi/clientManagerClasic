@@ -6,4 +6,5 @@
          Agregar includes explicitos de futuros changelogs SQL en orden.
          No incluir el consolidado historico ni generar un baseline. -->
     <include file="changes/20261109-01-direccion-clientes.sql" relativeToChangelogFile="true"/>
+    <include file="changes/20261112-01-extension-manual-licencias.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

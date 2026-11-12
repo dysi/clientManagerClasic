@@ -12,7 +12,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -137,7 +136,8 @@ public class WebSessionController {
 
     public static class DocumentCredentials {
         @Size(max = 2048) public String turnstileToken;
-        @NotNull public PortalAccessService.DocumentType type;
+        // Opcional para compatibilidad; el servidor detecta el tipo por longitud.
+        public PortalAccessService.DocumentType type;
         @NotBlank @Size(max = 32) public String document;
     }
 }
