@@ -68,7 +68,8 @@ async function changeStatus(client: Client) {
       <ListToolbar
         v-model="keyword"
         :loading="loading"
-        placeholder="Nombre, razón social, fantasía, correo, CUIL o usuario"
+        full-width
+        placeholder="Nombre, razón social, fantasía, correo, CUIL, DNI o usuario"
         @search="search"
       />
       <div class="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

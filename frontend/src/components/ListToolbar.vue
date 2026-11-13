@@ -3,11 +3,11 @@ import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import Toolbar from "primevue/toolbar";
 const keyword = defineModel<string>({ required: true });
-defineProps<{ loading: boolean; placeholder?: string }>();
+defineProps<{ loading: boolean; placeholder?: string; fullWidth?: boolean }>();
 defineEmits<{ search: [] }>();
 </script>
 <template>
-  <Toolbar class="mb-4 gap-4">
+  <Toolbar class="mb-4 gap-4" :pt="fullWidth ? { start: { class: 'w-full min-w-0' }, end: { class: 'hidden' } } : undefined">
     <template #start
       ><form
         class="flex w-full flex-wrap gap-2"
@@ -20,12 +20,13 @@ defineEmits<{ search: [] }>();
           v-model="keyword"
           :placeholder="placeholder || 'Buscar…'"
           maxlength="150"
-          class="w-full sm:w-72"
+          :class="fullWidth ? 'min-w-0 flex-1' : 'w-full sm:w-72'"
         /><Button
           type="submit"
           label="Buscar"
           icon="pi pi-search"
           :loading="loading"
+          :class="{ 'shrink-0': fullWidth }"
         /></form
     ></template>
     <template #end
