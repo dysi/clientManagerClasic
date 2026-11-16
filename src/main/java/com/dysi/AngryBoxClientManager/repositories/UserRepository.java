@@ -16,6 +16,14 @@ public interface UserRepository extends JpaRepository<User, Long>, org.springfra
     User findByUsername(String username);
     List<User> findByClient(com.dysi.AngryBoxClientManager.models.Client client);
 
+    interface ClientUserCount {
+        Long getClientId();
+        long getTotal();
+    }
+
+    @Query("select u.client.id as clientId, count(u) as total from User u where u.client.id in :ids group by u.client.id")
+    List<ClientUserCount> countForClients(@Param("ids") java.util.Collection<Long> ids);
+
     @Query("select new com.dysi.AngryBoxClientManager.dtos.UserCreateDTO("
     		+ " u.id, u.username, u.firstname, u.lastname)"
     		+ " from User u order by u.firstname asc, u.lastname asc")

@@ -31,6 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class WebSessionController {
     private final AuthenticationManager authenticationManager;
     private final PortalAccessService portal;
+    private final com.dysi.AngryBoxClientManager.servicesImpl.PortalTicketService tickets;
     private final DocumentLoginLimiter limiter;
     private final com.dysi.AngryBoxClientManager.security.TurnstileService turnstile;
     private final com.dysi.AngryBoxClientManager.config.SupportContactProperties support;
@@ -39,7 +40,9 @@ public class WebSessionController {
             PortalAccessService portal,
             DocumentLoginLimiter limiter,
             com.dysi.AngryBoxClientManager.security.TurnstileService turnstile,
-            com.dysi.AngryBoxClientManager.config.SupportContactProperties support) {
+            com.dysi.AngryBoxClientManager.config.SupportContactProperties support,
+            com.dysi.AngryBoxClientManager.servicesImpl.PortalTicketService tickets) {
+        this.tickets = tickets;
         this.turnstile = turnstile;
         this.authenticationManager = authenticationManager;
         this.portal = portal;
@@ -95,6 +98,28 @@ public class WebSessionController {
         PortalPrincipal principal =
                 portal.documentLogin(credentials.type, credentials.document);
         return establish(new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()), request, response);
+    }
+
+    /** El ticket solo establece un principal de portal, aunque la cuenta tenga roles administrativos. */
+    @PostMapping("/portal-access")
+    public Map<String, Object> portalAccess(@Valid @RequestBody PortalTicketInput input,
+            Authentication current, HttpServletRequest request, HttpServletResponse response) {
+        PortalPrincipal principal = tickets.consume(input.ticket);
+        if (current != null && current.isAuthenticated()
+                && !(current instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+            if (!(current.getPrincipal() instanceof PortalPrincipal)
+                    || !((PortalPrincipal) current.getPrincipal()).getClientId().equals(principal.getClientId())
+                    || !((PortalPrincipal) current.getPrincipal()).getId().equals(principal.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Hay otra cuenta abierta en este navegador. Cerrá esa sesión y volvé a abrir el portal desde Angrybox.");
+            }
+        }
+        return establish(new UsernamePasswordAuthenticationToken(principal, null,
+                principal.getAuthorities()), request, response);
+    }
+
+    public static class PortalTicketInput {
+        @NotBlank @Size(min = 43, max = 43) public String ticket;
     }
 
     private Map<String, Object> establish(Authentication authentication, HttpServletRequest request,

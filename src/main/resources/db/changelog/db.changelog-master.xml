@@ -7,4 +7,5 @@
          No incluir el consolidado historico ni generar un baseline. -->
     <include file="changes/20261109-01-direccion-clientes.sql" relativeToChangelogFile="true"/>
     <include file="changes/20261112-01-extension-manual-licencias.sql" relativeToChangelogFile="true"/>
+    <include file="changes/20261113-01-multiples-usuarios-cliente.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

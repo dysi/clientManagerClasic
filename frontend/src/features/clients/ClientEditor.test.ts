@@ -44,6 +44,7 @@ const client: Client = {
   tradeName: null,
   externalCode: null,
   portalUserMissing: false,
+  userCount: 1,
 };
 function editor() {
   return mount(ClientEditor, {

@@ -36,7 +36,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.dni, '')) like :keyword escape '!' "
-            + "or lower(coalesce(u.username, '')) like :keyword escape '!')"
+            + "or exists (select account.id from User account where account.client = c and lower(account.username) like :keyword escape '!'))"
             + " and (:balanceState = 'ALL' or (:balanceState = 'UNKNOWN' and b.id is null)"
             + " or (:balanceState = 'DEBT' and b.amount > 0)"
             + " or (:balanceState = 'CREDIT' and b.amount < 0)"
@@ -52,7 +52,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.dni, '')) like :keyword escape '!' "
-            + "or lower(coalesce(u.username, '')) like :keyword escape '!')"
+            + "or exists (select account.id from User account where account.client = c and lower(account.username) like :keyword escape '!'))"
             + " and (:balanceState = 'ALL' or (:balanceState = 'UNKNOWN' and b.id is null)"
             + " or (:balanceState = 'DEBT' and b.amount > 0)"
             + " or (:balanceState = 'CREDIT' and b.amount < 0)"
@@ -71,7 +71,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
         return searchForWeb(keyword, "ALL", "ALL", null, pageable);
     }
 
-    public Client findClientByUser(User user);
+    @Query("select u.client from User u where u = :user")
+    public Client findClientByUser(@Param("user") User user);
 
     // Serializa presentaciones de un cliente para resolver reenvíos sin duplicar evidencia.
     @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
@@ -87,7 +88,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     List<Long> findPortalDocumentMatches(@Param("type") String type, @Param("document") String document,
             @Param("dni") String dni, org.springframework.data.domain.Pageable pageable);
 
-    @Query("select c.id from Client c where c.user.id = :userId")
+    @Query("select u.client.id from User u where u.id = :userId and u.client is not null")
     List<Long> findPortalClientsForUser(@Param("userId") Long userId,
             org.springframework.data.domain.Pageable pageable);
 

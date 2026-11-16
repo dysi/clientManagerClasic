@@ -16,7 +16,7 @@ function hasAddress(client: Client): boolean {
 </script>
 <template>
   <article :aria-labelledby="`client-heading-${client.id}`" class="min-w-0">
-    <Card :class="client.removed ? 'border border-red-200 bg-red-50! dark:border-red-900 dark:bg-red-950!' : ''">
+    <Card :class="client.removed ? 'border border-red-200 bg-red-50! dark:border-red-900' : ''">
       <template #content>
         <div class="flex min-w-0 flex-col gap-5 border-b border-surface pb-5 lg:flex-row lg:justify-between">
           <div class="min-w-0 flex-1">
@@ -38,6 +38,8 @@ function hasAddress(client: Client): boolean {
               size="small" :aria-label="`Editar cliente ${client.id}`" />
             <Button as="router-link" :to="{ path: '/licenses', query: { clientId: client.id } }"
               label="Licencias" icon="pi pi-key" outlined size="small" :aria-label="`Ver licencias del cliente ${client.id}`" />
+            <Button as="router-link" :to="{ path: '/users', query: { clientId: client.id } }"
+              label="Usuario" icon="pi pi-users" outlined size="small" :aria-label="`Ver usuarios del cliente ${client.id}`" />
             <Button as="router-link" :to="`/clients/${client.id}`" label="Ver detalle" text size="small"
               :aria-label="`Ver detalle de ${client.firstname} ${client.lastname}`" />
             <Button type="button" :label="client.removed ? 'Dar de alta' : 'Dar de baja'"
@@ -46,7 +48,7 @@ function hasAddress(client: Client): boolean {
           </div>
         </div>
         <Message v-if="client.portalUserMissing" severity="warn" :closable="false" class="mt-4">
-          Sin acceso al portal: vinculá un usuario desde Usuarios.
+          Sin cuenta de referencia para el acceso por DNI/CUIT: vinculá un usuario desde Usuarios.
         </Message>
         <div class="grid min-w-0 gap-6 pt-5 sm:grid-cols-2 xl:grid-cols-4">
           <section class="min-w-0" :aria-labelledby="`identity-${client.id}`">
@@ -67,7 +69,7 @@ function hasAddress(client: Client): boolean {
             <dl class="space-y-3 text-sm [overflow-wrap:anywhere]">
               <div><dt class="text-muted-color">Correo electrónico</dt><dd class="mt-1">{{ client.email || 'Sin registrar' }}</dd></div>
               <div><dt class="text-muted-color">Teléfono</dt><dd class="mt-1">{{ client.phone || 'Sin registrar' }}</dd></div>
-              <div><dt class="text-muted-color">Usuario vinculado</dt><dd class="mt-1">{{ !client.username || client.username === 'SIN ASIGNAR' ? 'Sin usuario vinculado' : client.username }}</dd></div>
+              <div><dt class="text-muted-color">Usuarios vinculados</dt><dd class="mt-1"><RouterLink :to="{ path: '/users', query: { clientId: client.id } }" class="text-primary hover:underline">{{ client.userCount }} {{ client.userCount === 1 ? 'cuenta' : 'cuentas' }} · Ver usuarios</RouterLink></dd></div>
             </dl>
           </section>
           <section class="min-w-0" :aria-labelledby="`address-${client.id}`">

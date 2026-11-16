@@ -158,10 +158,26 @@ class WebFrontendTests {
         write(browser, "PUT", "/web/api/users/" + id, input, 200);
         assertEquals(hash, users.findById(id).orElseThrow().getPassword());
         input.put("username", "another-user"); input.put("password", "NewPassword123!");
-        write(browser, "POST", "/web/api/users", input, 409);
+        JsonNode second = write(browser, "POST", "/web/api/users", input, 201);
+        long secondId = second.get("id").asLong();
+        Browser firstLogin = login("new-user", "NewPassword123!");
+        Browser secondLogin = login("another-user", "NewPassword123!");
+        mvc.perform(get("/web/portal/overview").session(firstLogin.session)).andExpect(status().isOk());
+        mvc.perform(get("/web/portal/overview").session(secondLogin.session)).andExpect(status().isOk());
+        write(browser, "PUT", "/web/api/users/" + secondId + "/password",
+                java.util.Map.of("password", "IndependentPassword123!"), 204);
+        assertEquals(hash, users.findById(id).orElseThrow().getPassword());
+        mvc.perform(get("/web/session").session(firstLogin.session)).andExpect(status().isOk());
+        mvc.perform(get("/web/session").session(secondLogin.session)).andExpect(status().isUnauthorized());
+        assertEquals(client, users.findById(secondId).orElseThrow().getClient().getId());
+        assertEquals(id, clients.findById(client).orElseThrow().getUser().getId());
+        mvc.perform(get("/web/api/clients/" + client).session(browser.session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.userCount").value(2));
+        mvc.perform(get("/web/api/clients").param("keyword", "another-user").session(browser.session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
         input.put("username", "new-user"); input.remove("password"); input.put("clientId", null);
         write(browser, "PUT", "/web/api/users/" + id, input, 200);
-        assertNull(clients.findById(client).orElseThrow().getUser());
+        assertEquals(secondId, clients.findById(client).orElseThrow().getUser().getId());
         assertNull(users.findById(id).orElseThrow().getClient());
         input.put("username", admin.getUsername()); input.put("enabled", false); input.put("roles", List.of("ROLE_ADMIN"));
         write(browser, "PUT", "/web/api/users/" + admin.getId(), input, 409);
@@ -183,6 +199,10 @@ class WebFrontendTests {
     }
 
     private Browser login() throws Exception {
+        return login("browser-admin", "test-password");
+    }
+
+    private Browser login(String username, String password) throws Exception {
         MvcResult result = mvc.perform(get("/web/session/csrf")).andExpect(status().isOk()).andReturn();
         MockHttpSession session = (MockHttpSession) result.getRequest().getSession();
         String oldId = session.getId();
@@ -190,7 +210,7 @@ class WebFrontendTests {
         mvc.perform(post("/web/session/login").session(session)
                 .header(csrf.get("headerName").asText(), csrf.get("token").asText())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"browser-admin\",\"password\":\"test-password\"}"))
+                .content(json.writeValueAsString(java.util.Map.of("username", username, "password", password))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.token").doesNotExist());
         assertNotEquals(oldId, session.getId(), "Login must rotate the session ID");
         JsonNode rotated = json.readTree(mvc.perform(get("/web/session/csrf").session(session))

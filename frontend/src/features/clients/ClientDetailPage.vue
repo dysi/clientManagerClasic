@@ -36,7 +36,7 @@ onMounted(async () => {
         icon="pi pi-pencil"
     /></PageHeader>
     <Message v-if="client.portalUserMissing" severity="warn" :closable="false" class="mb-5">
-      Este cliente no tiene un usuario vinculado y no puede ingresar al portal. Vinculá una cuenta habilitada desde Usuarios.
+      Este cliente no tiene una cuenta de referencia para ingresar por DNI/CUIT. Vinculá una cuenta habilitada desde Usuarios.
     </Message>
     <div class="grid gap-6 lg:grid-cols-3">
       <Card class="lg:col-span-2"
@@ -70,8 +70,13 @@ onMounted(async () => {
               </dd>
             </div>
             <div>
-              <dt class="text-sm text-muted-color">Usuario vinculado</dt>
-              <dd class="mt-2">{{ client.username }}</dd>
+              <dt class="text-sm text-muted-color">Usuarios vinculados</dt>
+              <dd class="mt-2">
+                <RouterLink :to="{ path: '/users', query: { clientId: client.id } }" class="text-primary hover:underline">
+                  {{ client.userCount }} {{ client.userCount === 1 ? 'cuenta' : 'cuentas' }} · Ver usuarios
+                </RouterLink>
+                <p class="mt-2 text-sm text-muted-color">Referencia del acceso por DNI/CUIT: {{ client.username }}</p>
+              </dd>
             </div>
 <div v-if="client.street"><dt class="text-sm text-muted-color">Calle</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.street }}</dd></div>
 <div v-if="client.streetNumber"><dt class="text-sm text-muted-color">Número</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.streetNumber }}</dd></div>
@@ -115,6 +120,12 @@ onMounted(async () => {
               label="Ver usuarios vinculados"
               icon="pi pi-users"
               text
+            /><Button
+              as="router-link"
+              :to="{ path: '/users/new', query: { clientId: client.id } }"
+              label="Nuevo usuario"
+              icon="pi pi-user-plus"
+              outlined
             /></div></template
       ></Card>
       <Card class="lg:col-span-3">

@@ -75,7 +75,7 @@ public class LicenseExtensionService {
         Client client = clients.lockPortalClient(clientId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el cliente."));
         em.refresh(client);
-        if (client.getUser() != null) em.refresh(client.getUser());
+        em.refresh(em.find(com.dysi.AngryBoxClientManager.models.User.class, principal.getId()));
         access.revalidate(principal);
         Instant now = Instant.now();
         PortalViews.Extension result = evaluate(clientId, now, null);

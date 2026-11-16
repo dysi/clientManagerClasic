@@ -34,6 +34,7 @@ export interface Client {
   externalCode: string | null;
   portalUserMissing: boolean;
   username: string;
+  userCount: number;
 }
 export type ClientInput = Pick<
   Client,

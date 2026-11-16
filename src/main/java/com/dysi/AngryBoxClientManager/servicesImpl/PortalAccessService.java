@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Resuelve el cliente en servidor y comprueba ambos lados del vínculo en cada petición. */
+/** Resuelve el cliente desde la cuenta; el acceso por documento conserva su referencia histórica. */
 @Service
 @Transactional(readOnly = true)
 public class PortalAccessService {
@@ -52,7 +52,7 @@ public class PortalAccessService {
         List<Long> matches = clients.findPortalClientsForUser(user.getId(), PageRequest.of(0, 2));
         if (matches.size() != 1) throw denied();
         Client client = clients.findById(matches.get(0)).orElseThrow(this::denied);
-        associatedUser(client);
+        validateAccount(client, user);
         return new PortalPrincipal(client.getId(), user, OperationOrigin.ACCESO_AUTENTICADO);
     }
 
@@ -70,7 +70,10 @@ public class PortalAccessService {
 
     public PortalPrincipal revalidate(PortalPrincipal principal) {
         Client client = clients.findById(principal.getClientId()).orElseThrow(this::denied);
-        User user = associatedUser(client);
+        User user = users.findById(principal.getId()).orElseThrow(this::denied);
+        validateAccount(client, user);
+        if (principal.getOrigin() == OperationOrigin.PORTAL_DOCUMENTO
+                && (client.getUser() == null || !Objects.equals(client.getUser().getId(), user.getId()))) throw denied();
         if (!Objects.equals(user.getId(), principal.getId())
                 || !Objects.equals(user.getLastPasswordResetDate(), principal.getLastPasswordResetDate())) {
             throw denied();
@@ -88,12 +91,16 @@ public class PortalAccessService {
 
     private User associatedUser(Client client) {
         User user = client.getUser();
+        validateAccount(client, user);
+        return user;
+    }
+
+    private void validateAccount(Client client, User user) {
         if (user == null || user.getRemoveDate() != null
                 || !Boolean.TRUE.equals(user.getEnabled()) || user.getClient() == null
                 || !Objects.equals(user.getClient().getId(), client.getId())) throw denied();
         List<Long> matches = clients.findPortalClientsForUser(user.getId(), PageRequest.of(0, 2));
         if (matches.size() != 1 || !Objects.equals(matches.get(0), client.getId())) throw denied();
-        return user;
     }
 
     private void invalidDocument() {

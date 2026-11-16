@@ -66,7 +66,7 @@ async function logout() {
 }
 function expired() {
   session.user = null;
-  if (route.path !== "/login" && route.path !== "/access")
+  if (route.path !== "/login" && route.path !== "/access" && route.path !== "/portal-access")
     void router.replace(loginLocation(route.fullPath));
 }
 function focusContent() {
@@ -87,7 +87,7 @@ onUnmounted(() => {
 <template>
   <ConfirmDialog /><Toast />
   <div :class="helpVisible ? 'pb-24' : undefined">
-  <RouterView v-if="route.path === '/login' || route.path === '/access'" :key="route.path" />
+  <RouterView v-if="route.path === '/login' || route.path === '/access' || route.path === '/portal-access'" :key="route.path" />
   <div v-else class="min-h-screen bg-surface-50 text-color">
     <a
       href="#main"

@@ -272,17 +272,23 @@ public class WebAdminService {
             roles.add(authority);
         }
         Client previous = user.getClient();
-        Client next = input.clientId == null ? null : findClient(input.clientId);
-        if (next != null && ((next.getUser() != null && !Objects.equals(next.getUser().getId(), user.getId()))
-                || users.findByClient(next).stream().anyMatch(other -> !Objects.equals(other.getId(), user.getId()))))
-            conflict("El cliente ya tiene un usuario vinculado.");
+        Client next = input.clientId == null ? null : clients.lockPortalClient(input.clientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el cliente."));
         if (previous != null && previous != next && previous.getUser() != null && Objects.equals(previous.getUser().getId(), user.getId())) {
-            previous.setUser(null); clients.save(previous);
+            previous.setUser(users.findByClient(previous).stream()
+                    .filter(other -> !Objects.equals(other.getId(), user.getId()))
+                    .min(java.util.Comparator.comparing(User::getId)).orElse(null));
+            clients.save(previous);
         }
+        if (previous != null && previous != next) previous.getUsers().remove(user);
         user.setFirstname(input.firstname.trim()); user.setLastname(input.lastname.trim()); user.setEmail(input.email.trim());
         user.setEnabled(input.enabled); user.setAuthorities(roles); user.setClient(next);
         users.saveAndFlush(user);
-        if (next != null) { next.setUser(user); clients.saveAndFlush(next); }
+        if (next != null) {
+            if (!next.getUsers().contains(user)) next.getUsers().add(user);
+            if (next.getUser() == null) next.setUser(user);
+            clients.saveAndFlush(next);
+        }
     }
 
     @Transactional

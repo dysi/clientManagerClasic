@@ -19,6 +19,7 @@ public class WebClientView extends ClientDTO {
     public Long provinceId;
     public String provinceName;
     public boolean removed;
+    public long userCount;
     public Balance accountBalance;
     public WebClientView(Client client, ClientAccountBalance balance) {
         super(client.getId(), client.getFirstname(), client.getLastname(), client.getEmail(),

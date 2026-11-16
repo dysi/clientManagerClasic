@@ -115,7 +115,15 @@ public class Client extends AuditableEntity {
     public void setDni(String dni) { this.dni = dni; }
 
     @OneToOne
+    // Referencia histórica para atribuir el acceso por documento; no limita las cuentas del cliente.
     private User user;
+
+    @OneToMany(mappedBy = "client")
+    @JsonIgnore
+    private List<User> users = new java.util.ArrayList<>();
+
+    @JsonIgnore
+    public List<User> getUsers() { return users; }
 
     @OneToMany(mappedBy = "client")
     private List<License> licenses;

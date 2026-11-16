@@ -46,3 +46,12 @@ export async function signOut() {
   session.user = null;
   await refreshCsrf();
 }
+
+export async function signInFromAngrybox(ticket: string) {
+  await refreshCsrf();
+  session.user = await request<SessionUser>("/web/session/portal-access", {
+    method: "POST",
+    body: JSON.stringify({ ticket }),
+  });
+  await refreshCsrf();
+}

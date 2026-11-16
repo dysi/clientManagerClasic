@@ -62,6 +62,7 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
 	public User editUser(UserCreateDTO user) throws Exception {
 
 		try {
@@ -91,21 +92,28 @@ public class UserServiceImpl implements UserService {
 			nu.setPassword(passwordEncoder.encode(user.getPassword()));
 			nu.setAuthorities(this.getAuthorityList(user.getAuthorities()));
 
+			Client previous = nu.getClient();
 			if (user.getClientID() != null && user.getClientID().longValue() > 0) {
-				clientUpdate = this.clientRepository.findById(user.getClientID()).orElse(null);
-				nu.setClient(clientUpdate);
-				clientUpdate.setUser(nu);
-			} else {
-				nu.setClient(null);
-				if (nu.getClient() != null) {
-					clientUpdate = nu.getClient();
-					clientUpdate.setUser(null);
+				clientUpdate = this.clientRepository.lockPortalClient(user.getClientID())
+						.orElseThrow(() -> new Exception("Cliente inexistente"));
+			}
+			if (previous != null && previous != clientUpdate) {
+				previous.getUsers().remove(nu);
+				if (previous.getUser() != null && previous.getUser().getId().equals(nu.getId())) {
+					final Long movingUserId = nu.getId();
+					previous.setUser(userRepository.findByClient(previous).stream()
+							.filter(other -> !other.getId().equals(movingUserId))
+							.min(java.util.Comparator.comparing(User::getId)).orElse(null));
+					clientRepository.save(previous);
 				}
 			}
+			nu.setClient(clientUpdate);
 
 			nu = this.userRepository.saveAndFlush(nu);
 
 			if (clientUpdate != null) {
+				if (!clientUpdate.getUsers().contains(nu)) clientUpdate.getUsers().add(nu);
+				if (clientUpdate.getUser() == null) clientUpdate.setUser(nu);
 				this.clientRepository.save(clientUpdate);
 			}
 

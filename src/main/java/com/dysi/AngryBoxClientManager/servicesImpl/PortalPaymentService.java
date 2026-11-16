@@ -76,7 +76,7 @@ public class PortalPaymentService {
         Client client = clients.lockPortalClient(current.getClientId()).orElseThrow(this::missing);
         // OSIV puede conservar entidades de la validación previa a procesar los archivos.
         em.refresh(client);
-        if (client.getUser() != null) em.refresh(client.getUser());
+        em.refresh(em.find(User.class, principal.getId()));
         current = access.revalidate(principal);
         Optional<Payment> previous = payments.findByClientIdAndSubmissionKey(client.getId(), input.submissionKey);
         if (previous.isPresent()) {
@@ -133,7 +133,7 @@ public class PortalPaymentService {
                 enlist(receipts); enlisted.set(true);
                 PortalPrincipal actor = access.revalidate(principal);
                 Client client = clients.lockPortalClient(actor.getClientId()).orElseThrow(this::missing);
-                em.refresh(client); if (client.getUser() != null) em.refresh(client.getUser());
+                em.refresh(client); em.refresh(em.find(User.class, principal.getId()));
                 actor = access.revalidate(principal);
                 Payment payment = payments.findByIdAndClientIdAndRemoveDateIsNull(id, actor.getClientId()).orElseThrow(this::missing);
                 Long count = em.createQuery("select count(pa) from PaymentAttachment pa where pa.payment.id = :id and pa.uploadKey = :key", Long.class)

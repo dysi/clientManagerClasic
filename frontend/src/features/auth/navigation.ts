@@ -27,6 +27,7 @@ export function returnPath(value: unknown, router: Router): string {
   if (
     destination.path === "/login" ||
     destination.path === "/access" ||
+    destination.path === "/portal-access" ||
     !destination.matched.length ||
     destination.matched.some((record) => record.redirect)
   )
