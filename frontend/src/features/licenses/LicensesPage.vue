@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
+import Dialog from "primevue/dialog";
 import Message from "primevue/message";
 import Select from "primevue/select";
 import { useToast } from "primevue/usetoast";
@@ -20,6 +21,8 @@ import { request } from "../../services/http";
 import { licenseRowClass, lockDateLabel } from "./presentation";
 import type { License } from "../../services/admin";
 import { clientsApi } from "../clients/api";
+import LicenseEditor from "./LicenseEditor.vue";
+import LicenseBatchDialog from "./LicenseBatchDialog.vue";
 const route = useRoute();
 const toast = useToast();
 const confirm = useConfirmAction();
@@ -35,6 +38,27 @@ const visibilityOptions = [
   { label: "Ocultos", value: "HIDDEN" },
 ];
 const acting = ref<number>();
+const editingId = ref<number>();
+const editor = ref<InstanceType<typeof LicenseEditor> | null>(null);
+const selectionMode = ref(false);
+const selected = ref<License[]>([]);
+const batchSelection = ref<License[] | null>(null);
+function toggleSelection() {
+  selectionMode.value = !selectionMode.value;
+  selected.value = [];
+}
+function batchSaved(updated: License[]) {
+  const byId = new Map(updated.map(license => [license.id, license]));
+  rows.value = rows.value.map(row => byId.get(row.id) ?? row);
+  selected.value = [];
+  batchSelection.value = null;
+}
+function licenseSaved(license: License) {
+  // Conserva página, filtros y filas: los estados calculados vienen del guardado.
+  rows.value = rows.value.map(row => row.id === license.id ? license : row);
+  selected.value = [];
+  editingId.value = undefined;
+}
 const initialClientId = Number(route.query.clientId);
 const clientId = ref<number | null>(
   Number.isSafeInteger(initialClientId) && initialClientId > 0
@@ -67,6 +91,8 @@ const {
   visibility: visibility.value,
   clientId: clientId.value,
 }));
+// Una selección nunca se traslada silenciosamente a otra búsqueda o página.
+watch(loading, value => { if (value) selected.value = []; }, { flush: "sync" });
 onMounted(async () => {
   const id = clientId.value;
   if (id == null) return;
@@ -193,8 +219,21 @@ async function changeVisibility(license: License) {
               @change="search"
           /></FormField></div
       ></ListToolbar>
+      <div class="mb-4 flex flex-wrap items-center gap-3">
+        <Button type="button" :label="selectionMode ? 'Cancelar selección' : 'Seleccionar licencias'"
+          icon="pi pi-check-square" severity="secondary" outlined :disabled="loading || acting != null"
+          @click="toggleSelection" />
+        <template v-if="selectionMode">
+          <span class="text-sm" role="status">{{ selected.length }} seleccionadas de {{ rows.length }} en esta página</span>
+          <Button type="button" label="Modificar seleccionados" icon="pi pi-pencil"
+            :disabled="!selected.length || loading || acting != null"
+            @click="batchSelection = selected.map(license => ({ ...license }))" />
+          <p class="w-full text-sm text-muted-color">La casilla de la cabecera selecciona todas las licencias de esta página. Cambiar de búsqueda o página limpia la selección.</p>
+        </template>
+      </div>
       <div class="min-w-0 overflow-x-auto">
       <DataTable
+        v-model:selection="selected"
         :value="rows"
         :loading="loading"
         data-key="id"
@@ -206,11 +245,17 @@ async function changeVisibility(license: License) {
         <template #empty
           >No se encontraron licencias con estos filtros.</template
         >
+        <Column v-if="selectionMode" selection-mode="multiple" header-style="width: 3rem" />
         <Column header="Empresa"
           ><template #body="{ data }"
             ><span class="font-medium">{{ data.companyName }}</span>
             <p class="mt-1 text-sm text-muted-color">
-              Empresa #{{ data.companyId }} · {{ data.clientName }}
+              Empresa #{{ data.companyId }} ·
+              <RouterLink
+                :to="`/clients/${data.clientId}`"
+                class="text-primary underline"
+                :aria-label="`Ver cliente ${data.clientName}`"
+              >{{ data.clientName }}</RouterLink>
             </p>
             <p v-if="data.clientRemoved" class="mt-1 text-sm font-medium text-red-700 dark:text-red-300">Cliente dado de baja: bloqueo indirecto de la licencia.</p>
             <p v-if="data.hidden" class="mt-1 text-sm text-muted-color">Oculta en el portal</p></template
@@ -232,8 +277,8 @@ async function changeVisibility(license: License) {
           ><template #body="{ data }"
             ><div class="flex flex-wrap gap-1">
               <Button
-                as="router-link"
-                :to="`/licenses/${data.id}/edit`"
+                type="button"
+                @click="editingId = data.id"
                 label="Editar"
                 icon="pi pi-pencil"
                 text
@@ -270,4 +315,13 @@ async function changeVisibility(license: License) {
         @change="paginate"
       /> </template
   ></Card>
+  <Dialog v-if="editingId != null" :visible="true" modal header="Editar licencia"
+    class="w-[min(64rem,calc(100vw-2rem))]" :draggable="false"
+    :closable="!editor?.saving" :close-on-escape="!editor?.saving"
+    @update:visible="!$event && editor?.cancel()">
+    <LicenseEditor :key="editingId" ref="editor" :id="editingId"
+      @saved="licenseSaved" @cancel="editingId = undefined" />
+  </Dialog>
+  <LicenseBatchDialog v-if="batchSelection" :licenses="batchSelection"
+    @close="batchSelection = null" @saved="batchSaved" />
 </template>

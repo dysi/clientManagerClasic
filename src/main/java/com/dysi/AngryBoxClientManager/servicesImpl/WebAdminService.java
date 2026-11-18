@@ -113,6 +113,38 @@ public class WebAdminService {
         return licenseView(license);
     }
 
+    /** Aplica el campo elegido a la selección completa o revierte todo ante un error. */
+    @Transactional
+    public List<LicenseView> batchLicenses(LicenseBatchInput input) {
+        if (input.action == LicenseBatchAction.LOCK_DATE && input.lockDate == null)
+            bad("Ingresá la nueva fecha de vencimiento.");
+        if (new HashSet<>(input.ids).size() != input.ids.size()) bad("La selección contiene licencias repetidas.");
+        // Orden estable para que dos selecciones superpuestas tomen los locks en el mismo orden.
+        List<License> selected = input.ids.stream().sorted()
+                .map(id -> licenses.lockById(id).orElseThrow(() -> missing("licencia")))
+                .collect(Collectors.toList());
+        for (License license : selected) {
+            LicenseStatus state = currentState(license);
+            if (state == null && input.action != LicenseBatchAction.LOCK_DATE)
+                conflict("La licencia de " + license.getCompanyName() + " no tiene estado. Completá sus datos antes de cambiar su bloqueo. No se modificó ninguna licencia.");
+            if (state == null) {
+                if (license.getLicenseStatuses() == null) license.setLicenseStatuses(new ArrayList<>());
+                state = new LicenseStatus();
+                state.setLicense(license); state.setForcedLock(false);
+                state.setLimitTransaction(9999999L); state.setObservation("");
+                license.getLicenseStatuses().add(state);
+            } else {
+                entityManager.refresh(state, javax.persistence.LockModeType.PESSIMISTIC_WRITE);
+                if (state.getRemoveDate() != null) conflict("El estado de una licencia cambió. Volvé a buscar y revisá la selección.");
+            }
+            if (input.action == LicenseBatchAction.LOCK_DATE) state.setLockDate(calendar(input.lockDate));
+            else state.setForcedLock(input.action == LicenseBatchAction.BLOCK);
+        }
+        licenses.saveAll(selected);
+        licenses.flush();
+        return selected.stream().map(WebAdminService::licenseView).collect(Collectors.toList());
+    }
+
     @Transactional
     public LicenseView visibility(long id, boolean hidden) {
         License license = licenses.lockById(id).orElseThrow(() -> missing("licencia"));

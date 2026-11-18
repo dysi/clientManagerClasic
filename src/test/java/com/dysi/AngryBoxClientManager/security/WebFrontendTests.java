@@ -58,6 +58,13 @@ class WebFrontendTests {
         long second = newClient(browser, "Segundo");
         long license = write(browser, "POST", "/web/api/licenses", licenseInput(first, 111L), 201).get("id").asLong();
         write(browser, "POST", "/web/api/licenses", licenseInput(second, 222L), 201);
+        mvc.perform(get("/web/api/clients").session(browser.session).param("keyword", "Primero"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].licenseCounts.total").value(1))
+                .andExpect(jsonPath("$.content[0].licenseCounts.active").value(1))
+                .andExpect(jsonPath("$.content[0].licenseCounts.expired").value(0))
+                .andExpect(jsonPath("$.content[0].licenseCounts.blocked").value(0))
+                .andExpect(jsonPath("$.content[0].licenseCounts.unknown").value(0));
         for (String resource : List.of("clients", "licenses", "payments", "users")) {
             mvc.perform(get("/web/api/" + resource).session(browser.session))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(50));
@@ -85,11 +92,20 @@ class WebFrontendTests {
             JsonNode result = write(browser, "PUT", "/web/api/licenses/" + id, input, 200);
             assertEquals(days[index], result.get("daysUntilLock").asInt());
             assertEquals(states[index], result.get("status").asText());
+            mvc.perform(get("/web/api/clients/" + input.get("clientId")).session(browser.session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.licenseCounts.total").value(1))
+                    .andExpect(jsonPath("$.licenseCounts.active").value(days[index] > 0 ? 1 : 0))
+                    .andExpect(jsonPath("$.licenseCounts.expired").value(days[index] <= 0 ? 1 : 0));
         }
         assertEquals("BLOCKED", write(browser, "PUT", "/web/api/licenses/" + id + "/lock",
                 java.util.Map.of("locked", true), 200).get("status").asText());
         input.put("lockDate", java.time.LocalDate.now().minusDays(1).toString());
         assertEquals("BLOCKED", write(browser, "PUT", "/web/api/licenses/" + id, input, 200).get("status").asText());
+        mvc.perform(get("/web/api/clients/" + input.get("clientId")).session(browser.session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.licenseCounts.blocked").value(1))
+                .andExpect(jsonPath("$.licenseCounts.expired").value(0));
     }
 
     @Test void licensesValidateOwnershipUniquenessAndExplicitIdempotentLock() throws Exception {
@@ -112,6 +128,41 @@ class WebFrontendTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
         input.put("clientId", client); input.put("companyName", "Actualizada");
         assertEquals("2099-12-31", write(browser, "PUT", "/web/api/licenses/" + id, input, 200).get("lockDate").asText());
+        String batchPath = "/web/api/licenses/batch";
+        write(browser, "PUT", batchPath, java.util.Map.of("ids", List.of(id, id), "action", "BLOCK"), 400);
+        write(browser, "PUT", batchPath, java.util.Map.of("ids", List.of(id), "action", "LOCK_DATE"), 400);
+        write(browser, "PUT", batchPath, java.util.Map.of("ids", List.of(id, 999999L), "action", "BLOCK"), 404);
+        mvc.perform(get("/web/api/licenses/" + id).session(browser.session))
+                .andExpect(jsonPath("$.locked").value(false));
+        write(browser, "PUT", "/web/api/licenses/" + id + "/lock", java.util.Map.of("locked", true), 200);
+        String date = java.time.LocalDate.now().toString();
+        JsonNode changed = write(browser, "PUT", batchPath,
+                java.util.Map.of("ids", List.of(second, id), "action", "LOCK_DATE", "lockDate", date), 200);
+        assertEquals(2, changed.size());
+        for (JsonNode license : changed) {
+            assertEquals(date, license.get("lockDate").asText());
+            assertEquals(license.get("id").asLong() == id, license.get("locked").asBoolean());
+        }
+        for (int retry = 0; retry < 2; retry++) {
+            JsonNode blocked = write(browser, "PUT", batchPath,
+                    java.util.Map.of("ids", List.of(id, second), "action", "BLOCK"), 200);
+            for (JsonNode license : blocked) {
+                assertTrue(license.get("locked").asBoolean());
+                assertEquals(date, license.get("lockDate").asText());
+            }
+        }
+        for (int retry = 0; retry < 2; retry++) {
+            JsonNode unblocked = write(browser, "PUT", batchPath,
+                    java.util.Map.of("ids", List.of(id, second), "action", "UNBLOCK"), 200);
+            for (JsonNode license : unblocked) {
+                assertFalse(license.get("locked").asBoolean());
+                assertEquals(date, license.get("lockDate").asText());
+                assertEquals("EXPIRED", license.get("status").asText());
+            }
+        }
+        mvc.perform(put(batchPath).session(browser.session).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("ids", List.of(id), "action", "BLOCK"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test void obsoletePaymentWritesAreClosedAndUnknownIdsRemainNotFound() throws Exception {
@@ -267,6 +318,7 @@ class WebFrontendTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Portal"))
                 .andExpect(jsonPath("$.origin").value("ACCESO_AUTENTICADO"));
         mvc.perform(get("/web/api/clients").session(browser.session)).andExpect(status().isForbidden());
+        write(browser, "PUT", "/web/api/licenses/batch", java.util.Map.of("ids", List.of(1L), "action", "BLOCK"), 403);
         mvc.perform(get("/users/create").session(browser.session)).andExpect(status().isForbidden());
         // Incluso un usuario ADMIN asociado solo recibe la capacidad del portal por documento.
         Authority admin = new Authority(); admin.setName(AuthorityName.ROLE_ADMIN); authorities.saveAndFlush(admin);

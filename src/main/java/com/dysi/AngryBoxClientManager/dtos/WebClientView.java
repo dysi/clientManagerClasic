@@ -20,6 +20,7 @@ public class WebClientView extends ClientDTO {
     public String provinceName;
     public boolean removed;
     public long userCount;
+    public LicenseCounts licenseCounts = new LicenseCounts();
     public Balance accountBalance;
     public WebClientView(Client client, ClientAccountBalance balance) {
         super(client.getId(), client.getFirstname(), client.getLastname(), client.getEmail(),
@@ -41,6 +42,20 @@ public class WebClientView extends ClientDTO {
         removed = client.getRemoveDate() != null;
         if (balance != null) accountBalance = new Balance(balance);
     }
+    public static class LicenseCounts {
+        public long total, active, expired, blocked, unknown;
+
+        public LicenseCounts() { }
+
+        public LicenseCounts(com.dysi.AngryBoxClientManager.repositories.LicenseRepository.ClientLicenseCount count) {
+            total = count.getTotal();
+            active = count.getActive();
+            expired = count.getExpired();
+            blocked = count.getBlocked();
+            unknown = count.getUnknown();
+        }
+    }
+
     public static class Balance {
         public final Long id;
         public final Long clientId;

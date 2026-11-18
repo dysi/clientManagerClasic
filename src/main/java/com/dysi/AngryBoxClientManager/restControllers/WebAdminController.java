@@ -32,6 +32,9 @@ public class WebAdminController {
     public LicenseView createLicense(@Valid @RequestBody LicenseInput input) { return service.saveLicense(null, input); }
     @PutMapping("/licenses/{id}") public LicenseView updateLicense(@PathVariable long id, @Valid @RequestBody LicenseInput input) { return service.saveLicense(id, input); }
     @PutMapping("/licenses/{id}/lock") public LicenseView lock(@PathVariable long id, @Valid @RequestBody LockInput input) { return service.lockLicense(id, input.locked); }
+    @PutMapping("/licenses/batch") public List<LicenseView> batchLicenses(@Valid @RequestBody LicenseBatchInput input) {
+        return service.batchLicenses(input);
+    }
 
     @GetMapping("/payments") public Page<PaymentView> payments(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long licenseId, @RequestParam(defaultValue = "ALL") String status,

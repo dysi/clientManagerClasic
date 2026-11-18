@@ -35,6 +35,7 @@ export interface Client {
   portalUserMissing: boolean;
   username: string;
   userCount: number;
+  licenseCounts: { total: number; active: number; expired: number; blocked: number; unknown: number };
 }
 export type ClientInput = Pick<
   Client,

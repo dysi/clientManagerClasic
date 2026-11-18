@@ -22,6 +22,14 @@ public final class AdminInputs {
         @NotNull public Boolean prePayment;
     }
 
+    public enum LicenseBatchAction { LOCK_DATE, BLOCK, UNBLOCK }
+
+    public static class LicenseBatchInput {
+        @NotEmpty @Size(max = 100) public List<@NotNull @Positive Long> ids;
+        @NotNull public LicenseBatchAction action;
+        public LocalDate lockDate;
+    }
+
     /** Contrato reservado; las escrituras permanecen cerradas hasta la etapa de presentación. */
     public static class PaymentInput { }
 

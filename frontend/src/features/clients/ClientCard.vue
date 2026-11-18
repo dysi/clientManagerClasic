@@ -13,6 +13,16 @@ function hasAddress(client: Client): boolean {
   return Boolean(client.street || client.streetNumber || client.addressComplement || client.neighborhood
     || client.city || client.provinceName || client.countryName || client.postalCode);
 }
+
+function licenseSummary(client: Client): string {
+  const counts = client.licenseCounts;
+  return [
+    counts.active ? `${counts.active} ${counts.active === 1 ? 'activa' : 'activas'}` : '',
+    counts.expired ? `${counts.expired} ${counts.expired === 1 ? 'vencida' : 'vencidas'}` : '',
+    counts.blocked ? `${counts.blocked} ${counts.blocked === 1 ? 'bloqueada' : 'bloqueadas'}` : '',
+    counts.unknown ? `${counts.unknown} sin vigencia informada` : '',
+  ].filter(Boolean).join(' / ');
+}
 </script>
 <template>
   <article :aria-labelledby="`client-heading-${client.id}`" class="min-w-0">
@@ -31,6 +41,9 @@ function hasAddress(client: Client): boolean {
             </h2>
             <p v-if="client.tradeName || client.legalName" class="mt-2 text-muted-color [overflow-wrap:anywhere]">
               {{ client.lastname }}, {{ client.firstname }}
+            </p>
+            <p class="mt-2 text-sm [overflow-wrap:anywhere]">
+              <span class="font-medium">{{ client.licenseCounts.total }} {{ client.licenseCounts.total === 1 ? 'licencia' : 'licencias' }}</span><template v-if="client.licenseCounts.total">: {{ licenseSummary(client) }}</template>
             </p>
           </div>
           <div class="flex shrink-0 flex-wrap items-start gap-2 lg:max-w-96" role="group" :aria-label="`Acciones del cliente ${client.id}`">

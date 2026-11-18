@@ -10,6 +10,29 @@ import java.util.List;
 @Repository
 public interface LicenseRepository extends JpaRepository<License, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<License> {
 
+    interface ClientLicenseCount {
+        Long getClientId();
+        long getTotal();
+        long getActive();
+        long getExpired();
+        long getBlocked();
+        long getUnknown();
+    }
+
+    /** Incluye ocultas; usa el primer estado vigente igual que el listado administrativo. */
+    @org.springframework.data.jpa.repository.Query("select l.client.id as clientId, count(l) as total, "
+            + "sum(case when s.forcedLock = false and s.lockDate >= :tomorrow then 1 else 0 end) as active, "
+            + "sum(case when s.forcedLock = false and s.lockDate < :tomorrow then 1 else 0 end) as expired, "
+            + "sum(case when s.forcedLock = true then 1 else 0 end) as blocked, "
+            + "sum(case when s.id is null or (s.forcedLock = false and s.lockDate is null) then 1 else 0 end) as unknown "
+            + "from License l left join l.licenseStatuses s on s.removeDate is null "
+            + "where l.client.id in :ids and l.removeDate is null "
+            + "and (s.id is null or s.id = (select min(candidate.id) from LicenseStatus candidate "
+            + "where candidate.license = l and candidate.removeDate is null)) group by l.client.id")
+    List<ClientLicenseCount> countForClients(
+            @org.springframework.data.repository.query.Param("ids") java.util.Collection<Long> ids,
+            @org.springframework.data.repository.query.Param("tomorrow") java.util.Calendar tomorrow);
+
     @org.springframework.data.jpa.repository.Query("select new com.dysi.AngryBoxClientManager.dtos.PortalViews$LicenseTotals("
             + "count(l), sum(case when s.forcedLock = true then 1 else 0 end), "
             + "sum(case when s.forcedLock = false and s.lockDate < :tomorrow then 1 else 0 end), "

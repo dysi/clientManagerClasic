@@ -34,6 +34,13 @@ export type LicenseInput = Pick<
   | "lockDate"
   | "prePayment"
 >;
+export type LicenseBatchAction = "LOCK_DATE" | "BLOCK" | "UNBLOCK";
+export function updateSelectedLicenses(ids: number[], action: LicenseBatchAction, lockDate: string | null) {
+  return request<License[]>("/web/api/licenses/batch", {
+    method: "PUT",
+    body: JSON.stringify({ ids, action, lockDate: action === "LOCK_DATE" ? lockDate : null }),
+  });
+}
 export interface Payment {
   id: number;
   clientId: number;

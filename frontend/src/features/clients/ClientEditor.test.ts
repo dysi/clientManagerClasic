@@ -45,6 +45,7 @@ const client: Client = {
   externalCode: null,
   portalUserMissing: false,
   userCount: 1,
+  licenseCounts: { total: 0, active: 0, expired: 0, blocked: 0, unknown: 0 },
 };
 function editor() {
   return mount(ClientEditor, {
