@@ -42,6 +42,12 @@ export function updateSelectedLicenses(ids: number[], action: LicenseBatchAction
   });
 }
 export interface Payment {
+  bankAccountId: number;
+  destinationBank: string;
+  destinationHolder: string;
+  destinationCbu: string;
+  destinationAlias: string | null;
+  decidedBy: string | null;
   id: number;
   clientId: number;
   clientName: string;

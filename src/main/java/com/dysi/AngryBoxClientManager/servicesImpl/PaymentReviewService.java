@@ -75,10 +75,10 @@ public class PaymentReviewService {
                 }).collect(Collectors.toList());
     }
 
-    /** Corrección previa a la decisión, atómica con su evidencia privada e independiente de la aprobación. */
+    /** Corrección administrativa en cualquier estado, atómica con su evidencia privada e independiente de la aprobación. */
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, timeout = 120)
     public PaymentReviewViews.Detail correct(Long id, PaymentReviewInputs.Correction input) {
-        User actor = actor(); Payment payment = lockPayment(id); pending(payment, input.version);
+        User actor = actor(); Payment payment = lockPayment(id); currentVersion(payment, input.version);
         if (input.issuedAt.getYear() < 1000 || input.issuedAt.getYear() > 9999) bad("La fecha de emisión no es válida.");
         License license = input.licenseId == null ? null : em.find(License.class, input.licenseId, LockModeType.PESSIMISTIC_WRITE);
         if (license != null) em.refresh(license);
@@ -112,7 +112,7 @@ public class PaymentReviewService {
         payment.setAmount(input.amount); payment.setIssuedAt(input.issuedAt.truncatedTo(ChronoUnit.MICROS));
         payment.setContactPhone(input.contactPhone.trim()); payment.setLicense(license);
         Comment comment = new Comment(); comment.setVisibility(CommentVisibility.PRIVADO);
-        comment.setText("Corrección de pago pendiente. Motivo: " + input.reason.trim()
+        comment.setText("Corrección de pago. Motivo: " + input.reason.trim()
                 + "\nAntes: " + previous + "\nDespués: " + correctionValues(payment));
         comment.setAuthor(actor); comment.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); comment.setOccurredAt(now()); em.persist(comment);
         PaymentComment link = new PaymentComment(); link.setPayment(payment); link.setComment(comment); em.persist(link);
@@ -192,33 +192,40 @@ public class PaymentReviewService {
         return commentView(comment);
     }
     public PaymentReviewViews.Preview preview(Long id, PaymentReviewInputs.Options input) {
-        actor(); Payment payment = payment(id); pending(payment, input.version);
+        actor(); Payment payment = payment(id); currentVersion(payment, input.version);
+        if (payment.getStatus() == PaymentStatus.APROBADO) conflict("El pago ya está aprobado.");
         return plan(payment, input, false).view;
     }
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, timeout = 120)
     public PaymentReviewViews.Detail approve(Long id, PaymentReviewInputs.Approval input) {
-        User actor = actor(); Payment payment = lockPayment(id); pending(payment, input.version);
+        User actor = actor(); Payment payment = lockPayment(id); currentVersion(payment, input.version);
+        if (payment.getStatus() == PaymentStatus.APROBADO) conflict("El pago ya está aprobado.");
         Plan plan = plan(payment, input, true);
         if (!plan.view.today.equals(input.reviewedOn) || !plan.view.token.equals(input.previewToken))
             conflict("La revisión cambió o cambió el día. Actualizá la vista previa antes de confirmar.");
         for (Change change : plan.changes) if (change.view.shortening && !change.input.confirmShortening)
             bad("Confirmá expresamente cada reducción del vencimiento.");
         LocalDateTime now = now();
+        PaymentStatus previous = payment.getStatus();
         payment.decide(PaymentStatus.APROBADO);
         extensions.approve(payment);
-        // La aprobación y su entrega pendiente se confirman en la misma transacción.
-        AngryboxPaymentDelivery delivery = new AngryboxPaymentDelivery();
-        delivery.setPayment(payment);
-        em.persist(delivery);
+        // Reaprobar conserva la entrega existente, incluso si AngryBox ya la confirmó.
+        if (em.find(AngryboxPaymentDelivery.class, payment.getId()) == null) {
+            AngryboxPaymentDelivery delivery = new AngryboxPaymentDelivery();
+            delivery.setPayment(payment);
+            em.persist(delivery);
+        }
         for (Change change : plan.changes) apply(payment, change, actor, now);
-        history(payment, PaymentStatus.APROBADO, null, actor, now); em.flush(); return detailView(payment);
+        history(payment, previous, PaymentStatus.APROBADO, input.reason.trim(), actor, now); em.flush(); return detailView(payment);
     }
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, timeout = 120)
     public PaymentReviewViews.Detail reject(Long id, PaymentReviewInputs.Rejection input) {
-        User actor = actor(); Payment payment = lockPayment(id); pending(payment, input.version);
+        User actor = actor(); Payment payment = lockPayment(id); currentVersion(payment, input.version);
+        if (payment.getStatus() == PaymentStatus.RECHAZADO) conflict("El pago ya está rechazado.");
+        PaymentStatus previous = payment.getStatus();
         payment.decide(PaymentStatus.RECHAZADO);
         extensions.reject(payment);
-        history(payment, PaymentStatus.RECHAZADO, input.reason.trim(), actor, now()); em.flush(); return detailView(payment);
+        history(payment, previous, PaymentStatus.RECHAZADO, input.reason.trim(), actor, now()); em.flush(); return detailView(payment);
     }
 
     private Payment lockPayment(Long id) {
@@ -289,10 +296,14 @@ public class PaymentReviewService {
                     change.view.lockDate == null ? null : change.view.lockDate.toString(), change.input.lockDate.toString(), actor, now);
         }
     }
-    private void history(Payment payment, PaymentStatus next, String reason, User actor, LocalDateTime now) {
-        PaymentStatusHistory event = new PaymentStatusHistory(); event.setPayment(payment); event.setPreviousStatus(PaymentStatus.PENDIENTE);
+    private void history(Payment payment, PaymentStatus previous, PaymentStatus next, String reason, User actor, LocalDateTime now) {
+        PaymentStatusHistory event = new PaymentStatusHistory(); event.setPayment(payment); event.setPreviousStatus(previous);
         event.setNewStatus(next); event.setReason(reason); event.setOccurredAt(now); event.setResponsibleUser(actor);
         event.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); em.persist(event);
+        Comment comment = new Comment(); comment.setVisibility(CommentVisibility.PUBLICO);
+        comment.setText("Cambio de estado: " + previous + " → " + next + ". Comentario del auditor: " + reason);
+        comment.setAuthor(actor); comment.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); comment.setOccurredAt(now); em.persist(comment);
+        PaymentComment link = new PaymentComment(); link.setPayment(payment); link.setComment(comment); em.persist(link);
     }
     private void licenseEvent(Payment payment, License license, LicenseActionType type, String previous, String next, User actor, LocalDateTime now) {
         PaymentLicenseAction event = new PaymentLicenseAction(); event.setPayment(payment); event.setLicense(license); event.setActionType(type);
@@ -300,6 +311,9 @@ public class PaymentReviewService {
     }
     private PaymentReviewViews.Detail detailView(Payment payment) {
         PaymentReviewViews.Detail view = new PaymentReviewViews.Detail(); view.payment = WebAdminService.paymentView(payment); view.version = payment.getVersion();
+        AngryboxPaymentDelivery delivery = em.find(AngryboxPaymentDelivery.class, payment.getId());
+        if (delivery != null && delivery.getDeliveredAt() != null)
+            view.payment.angryboxSynchronizedAt = LocalDateTime.ofInstant(delivery.getDeliveredAt(), businessZone);
         view.contactPhone = payment.getContactPhone(); view.method = payment.getMethod().name(); view.destinationBank = payment.getDestinationBank();
         view.destinationHolder = payment.getDestinationHolder(); view.destinationCbu = payment.getDestinationCbu(); view.destinationAlias = payment.getDestinationAlias();
         view.withoutReceipt = payment.getWithoutReceipt(); view.noReceiptReason = payment.getNoReceiptReason(); view.origin = payment.getOrigin().name();
@@ -365,9 +379,9 @@ public class PaymentReviewService {
         if (page < 0 || size < 1 || size > 100 || page > Integer.MAX_VALUE / size) bad("Paginación inválida.");
         return PageRequest.of(page, size, Sort.by("id"));
     }
-    private void pending(Payment payment, Long version) {
-        if (payment.getStatus() != PaymentStatus.PENDIENTE || version == null || payment.getVersion() != version)
-            conflict("El pago ya fue resuelto o cambió. Actualizá su detalle antes de continuar.");
+    private void currentVersion(Payment payment, Long version) {
+        if (version == null || payment.getVersion() != version)
+            conflict("El pago cambió. Actualizá su detalle antes de continuar.");
     }
     private String status(boolean forced, LocalDate date) {
         // Conservar el bloqueo efectivo del flujo existente: vence al comenzar la fecha, según el servidor.

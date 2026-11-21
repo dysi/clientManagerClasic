@@ -28,8 +28,9 @@ public final class AdminViews {
     }
 
     public static class PaymentView {
-        public Long id, clientId, licenseId;
+        public Long id, clientId, licenseId, bankAccountId;
         public String clientName, companyName, currency, status;
+        public String destinationBank, destinationHolder, destinationCbu, destinationAlias, decidedBy;
         public BigDecimal amount;
         public java.time.LocalDateTime issuedAt;
         public java.time.LocalDateTime angryboxSynchronizedAt;

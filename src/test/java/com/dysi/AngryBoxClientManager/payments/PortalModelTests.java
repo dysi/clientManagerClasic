@@ -130,8 +130,21 @@ class PortalModelTests {
         assertThrows(IllegalStateException.class, () -> em.persist(comment));
     }
 
-    @Test void invalidHistoryTransitionsAreRejected() {
+    @Test void administrativeRectificationsPreserveHistoryAndRejectInvalidTransitions() {
         Payment payment = payment(); em.persist(payment);
+        for (PaymentStatus next : List.of(PaymentStatus.APROBADO, PaymentStatus.RECHAZADO, PaymentStatus.APROBADO, PaymentStatus.RECHAZADO)) {
+            PaymentStatus previous = payment.getStatus();
+            payment.decide(next);
+            PaymentStatusHistory event = new PaymentStatusHistory(); event.setPayment(payment);
+            event.setPreviousStatus(previous); event.setNewStatus(next); event.setReason("Rectificación del auditor");
+            event.setOccurredAt(LocalDateTime.now()); event.setResponsibleUser(actor);
+            event.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); em.persist(event); em.flush();
+            assertEquals(next, payment.getStatus());
+            assertThrows(IllegalStateException.class, () -> payment.decide(next));
+        }
+        assertEquals(4L, em.createQuery("select count(h) from PaymentStatusHistory h where h.payment = :payment", Long.class)
+                .setParameter("payment", payment).getSingleResult());
+        assertThrows(IllegalStateException.class, () -> payment.decide(PaymentStatus.PENDIENTE));
         PaymentStatusHistory history = new PaymentStatusHistory(); history.setPayment(payment);
         history.setNewStatus(PaymentStatus.APROBADO); history.setOccurredAt(LocalDateTime.now());
         history.setResponsibleUser(actor); history.setOrigin(OperationOrigin.ACCESO_AUTENTICADO);

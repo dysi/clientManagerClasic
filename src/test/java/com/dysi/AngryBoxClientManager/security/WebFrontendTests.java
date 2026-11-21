@@ -183,15 +183,35 @@ class WebFrontendTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].licenseId").isEmpty())
                 .andExpect(jsonPath("$.content[0].amount").value(100.25))
+                .andExpect(jsonPath("$.content[0].bankAccountId").value(payment.getBankAccount().getId()))
+                .andExpect(jsonPath("$.content[0].destinationBank").value(payment.getDestinationBank()))
+                .andExpect(jsonPath("$.content[0].decidedBy").isEmpty())
                 .andExpect(jsonPath("$.content[0].discount").doesNotExist())
                 .andExpect(jsonPath("$.content[0].paymentRealDate").doesNotExist())
                 .andExpect(jsonPath("$.content[0].bankAccount").doesNotExist())
                 .andExpect(jsonPath("$.content[0].submittedBy").doesNotExist());
         mvc.perform(get("/web/api/payments").session(browser.session).param("status", "APROBADO"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/web/api/payments").session(browser.session).param("bankAccountId", "999999"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/web/api/payments/counts").session(browser.session)
+                .param("bankAccountId", String.valueOf(payment.getBankAccount().getId())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.pending").value(1));
+        mvc.perform(get("/web/api/options/payment-bank-accounts").session(browser.session)
+                .param("keyword", payment.getDestinationBank()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(payment.getBankAccount().getId()));
         write(browser, "PUT", "/web/api/payments/" + payment.getId(), java.util.Map.of(), 409);
         write(browser, "PUT", "/web/api/payments/" + payment.getId() + "/status", java.util.Map.of("removed", true), 409);
         assertEquals(PaymentStatus.PENDIENTE, payments.findById(payment.getId()).orElseThrow().getStatus());
+        payment.decide(PaymentStatus.APROBADO);
+        PaymentStatusHistory decision = new PaymentStatusHistory(); decision.setPayment(payment);
+        decision.setPreviousStatus(PaymentStatus.PENDIENTE); decision.setNewStatus(PaymentStatus.APROBADO);
+        decision.setOccurredAt(java.time.LocalDateTime.of(2026, 11, 21, 12, 0));
+        decision.setResponsibleUser(actor); decision.setOrigin(OperationOrigin.ACCESO_AUTENTICADO);
+        em.persist(decision); em.flush();
+        mvc.perform(get("/web/api/payments").session(browser.session).param("status", "APROBADO"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].decidedBy").value(actor.getUsername()));
+
     }
 
     @Test void userProfilePreservesPasswordAndMaintainsBothSidesOfClientLink() throws Exception {

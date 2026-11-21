@@ -217,7 +217,7 @@ public class PortalPaymentService {
 
     private String rejectionReason(Payment payment) {
         if (payment.getStatus() != PaymentStatus.RECHAZADO) return null;
-        List<String> reasons = em.createQuery("select h.reason from PaymentStatusHistory h where h.payment.id = :id and h.newStatus = :state", String.class)
+        List<String> reasons = em.createQuery("select h.reason from PaymentStatusHistory h where h.payment.id = :id and h.newStatus = :state order by h.id desc", String.class)
                 .setParameter("id", payment.getId()).setParameter("state", PaymentStatus.RECHAZADO).setMaxResults(1).getResultList();
         return reasons.isEmpty() ? null : reasons.get(0);
     }

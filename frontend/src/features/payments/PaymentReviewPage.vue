@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
+import PaymentSyncWarning from "./PaymentSyncWarning.vue";
 import Select from "primevue/select";
 import Skeleton from "primevue/skeleton";
 import Tag from "primevue/tag";
@@ -54,7 +55,7 @@ async function reject() {
   const current = detail.value;
   if (!current || !rejection.value.reason.trim()) return;
   const result = await saveRejection(() => rejectPayment(id, current.version, rejection.value.reason.trim()), "El pago quedó rechazado.");
-  if (result) { detail.value = result; rejection.value.reason = ""; resetRejection(); rejecting.value = false; await history.load(); }
+  if (result) { detail.value = result; rejection.value.reason = ""; resetRejection(); rejecting.value = false; await Promise.all([history.load(), comments.load()]); }
 }
 async function closeRejection() {
   if (rejectingSave.value) return;
@@ -73,7 +74,8 @@ async function approved() { approving.value = false; await refreshAll(); }
   <Message v-else-if="loadError" severity="error" role="alert">{{ loadError }}</Message>
   <div v-else-if="detail" class="flex min-w-0 flex-col gap-6">
     <Card><template #title><div class="flex flex-wrap items-center justify-between gap-3"><span>{{ money(detail.payment.amount) }} · {{ detail.payment.currency }}</span><Tag :value="paymentLabels[detail.payment.status]" :severity="detail.payment.status === 'APROBADO' ? 'success' : detail.payment.status === 'RECHAZADO' ? 'danger' : 'warn'" /></div></template><template #content>
-      <dl class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <PaymentSyncWarning :synchronized-at="detail.payment.angryboxSynchronizedAt" />
+      <dl class="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div><dt class="text-sm text-muted-color">Cliente</dt><dd><RouterLink :to="'/clients/' + detail.payment.clientId" class="font-medium text-primary">{{ detail.payment.clientName }}</RouterLink></dd></div>
         <div><dt class="text-sm text-muted-color">Licencia asociada</dt><dd>{{ detail.payment.companyName || 'Sin licencia asociada' }}</dd></div>
         <div><dt class="text-sm text-muted-color">Emisión</dt><dd>{{ displayDateTime(detail.payment.issuedAt) }}</dd></div>
@@ -88,12 +90,11 @@ async function approved() { approving.value = false; await refreshAll(); }
         <div><dt class="text-sm text-muted-color">Origen de la presentación</dt><dd>{{ originLabel(detail.origin) }}</dd></div>
         <div v-if="detail.withoutReceipt" class="sm:col-span-2"><dt class="text-sm text-muted-color">Motivo original de ausencia de comprobante</dt><dd class="whitespace-pre-wrap break-words">{{ detail.noReceiptReason }}</dd></div>
       </dl>
-      <div v-if="detail.payment.status === 'PENDIENTE'" class="mt-6 flex flex-wrap justify-end gap-3">
+      <div class="mt-6 flex flex-wrap justify-end gap-3">
         <Button type="button" label="Editar pago" icon="pi pi-pencil" outlined :disabled="saving" @click="editing = true" />
-        <Button type="button" label="Rechazar" icon="pi pi-times" severity="danger" outlined :disabled="saving" @click="rejecting = true; rejectionError = ''" />
-        <Button type="button" label="Aprobar" icon="pi pi-check" :disabled="saving" @click="approving = true" />
+        <Button v-if="detail.payment.status !== 'RECHAZADO'" type="button" label="Rechazar" icon="pi pi-times" severity="danger" outlined :disabled="saving" @click="rejecting = true; rejectionError = ''" />
+        <Button v-if="detail.payment.status !== 'APROBADO'" type="button" label="Aprobar" icon="pi pi-check" :disabled="saving" @click="approving = true" />
       </div>
-      <Message v-else severity="info" :closable="false" class="mt-5">Este pago ya fue resuelto y no puede reabrirse.</Message>
     </template></Card>
     <Card><template #title>Comprobantes</template><template #content>
       <Message v-if="receipts.error.value" severity="error">{{ receipts.error.value }}</Message><Skeleton v-if="receipts.loading.value" height="6rem" />
@@ -135,7 +136,8 @@ async function approved() { approving.value = false; await refreshAll(); }
   <PaymentCorrectionDialog v-if="editing && detail" :detail="detail" @close="editing = false" @saved="corrected" />
   <Dialog :visible="rejecting" modal header="Rechazar pago" class="w-[min(36rem,calc(100vw-2rem))]" :closable="!rejectingSave" :close-on-escape="!rejectingSave" @update:visible="!$event && closeRejection()">
     <form id="rejectPayment" class="flex flex-col gap-4" :aria-busy="rejectingSave" @submit.prevent="reject">
-      <Message severity="warn" :closable="false">El motivo será público y visible para el cliente. El rechazo no puede revertirse.</Message>
+      <Message severity="warn" :closable="false">El motivo será público y visible para el cliente. El cambio queda registrado con tu usuario. No revierte acciones anteriores sobre licencias.</Message>
+      <PaymentSyncWarning :synchronized-at="detail?.payment.angryboxSynchronizedAt" />
       <Message v-if="rejectionError" severity="error" role="alert">{{ rejectionError }}</Message>
       <FormField id="rejectionReason" label="Motivo público del rechazo" required :error="rejectionFields.reason" v-slot="field"><Textarea id="rejectionReason" v-model="rejection.reason" maxlength="1000" rows="4" required :disabled="rejectingSave" :invalid="field.invalid" :aria-describedby="field.describedby" fluid /></FormField>
     </form>

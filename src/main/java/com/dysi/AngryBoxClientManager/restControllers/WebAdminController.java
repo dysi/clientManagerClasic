@@ -38,17 +38,17 @@ public class WebAdminController {
 
     @GetMapping("/payments") public Page<PaymentView> payments(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long licenseId, @RequestParam(defaultValue = "ALL") String status,
-            @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long clientId, @RequestParam(required = false) Long bankAccountId,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return service.payments(keyword, licenseId, status, clientId, from, to, page, size);
+        return service.payments(keyword, licenseId, status, clientId, bankAccountId, from, to, page, size);
     }
     @GetMapping("/payments/counts") public PaymentCounts paymentCounts(@RequestParam(defaultValue = "") String keyword,
-            @RequestParam(required = false) Long licenseId, @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long licenseId, @RequestParam(required = false) Long clientId, @RequestParam(required = false) Long bankAccountId,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
-        return service.paymentCounts(keyword, licenseId, clientId, from, to);
+        return service.paymentCounts(keyword, licenseId, clientId, bankAccountId, from, to);
     }
     @GetMapping("/payments/{id}") public PaymentView payment(@PathVariable long id) { return service.payment(id); }
     @PostMapping("/payments") @ResponseStatus(HttpStatus.CREATED)
@@ -69,6 +69,7 @@ public class WebAdminController {
     @PutMapping("/users/{id}/password") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void password(@PathVariable long id, @Valid @RequestBody PasswordInput input) { service.password(id, input.password); }
 
+    @GetMapping("/options/payment-bank-accounts") public List<Option> paymentBankAccountOptions(@RequestParam(defaultValue = "") String keyword) { return service.paymentBankAccountOptions(keyword); }
     @GetMapping("/options/clients") public List<Option> clientOptions(@RequestParam(defaultValue = "") String keyword) { return service.clientOptions(keyword); }
     @GetMapping("/options/licenses") public List<Option> licenseOptions(@RequestParam(defaultValue = "") String keyword) { return service.licenseOptions(keyword); }
 }
