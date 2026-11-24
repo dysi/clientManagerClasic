@@ -6,10 +6,8 @@ on:
       - 'prod_v*'
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    outputs:
-      jar_sha256: ${{ steps.checksum.outputs.sha256 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,28 +38,6 @@ jobs:
           sha256sum "$JAR"
           echo "sha256=$(sha256sum "$JAR" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: Subir artefacto al workflow
-        uses: actions/upload-artifact@v4
-        with:
-          name: clientmanager-jar
-          path: target/clientmanager-0.0.1-SNAPSHOT.jar
-          retention-days: 14
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Descargar artefacto
-        uses: actions/download-artifact@v4
-        with:
-          name: clientmanager-jar
-          path: dist
-
-      - name: Verificar checksum del artefacto descargado
-        run: |
-          echo "${{ needs.build.outputs.jar_sha256 }}  dist/clientmanager-0.0.1-SNAPSHOT.jar" | sha256sum -c -
-
       - name: Preparar SSH (key, known_hosts fijo, config con compat ssh-rsa)
         run: |
           mkdir -p ~/.ssh
@@ -84,12 +60,12 @@ jobs:
 
       - name: Subir jar al servidor (a cuarentena, no pisa nada todavía)
         run: |
-          scp dist/clientmanager-0.0.1-SNAPSHOT.jar prodserver:/home/deploy/incoming/clientmanager-0.0.1-SNAPSHOT.jar.new
+          scp target/clientmanager-0.0.1-SNAPSHOT.jar prodserver:/home/deploy/incoming/clientmanager-0.0.1-SNAPSHOT.jar.new
 
       - name: Verificar integridad en el servidor antes de tocar el servicio
         run: |
           REMOTE_SHA=$(ssh prodserver "sha256sum /home/deploy/incoming/clientmanager-0.0.1-SNAPSHOT.jar.new | cut -d' ' -f1")
-          LOCAL_SHA="${{ needs.build.outputs.jar_sha256 }}"
+          LOCAL_SHA="${{ steps.checksum.outputs.sha256 }}"
           echo "Local:  $LOCAL_SHA"
           echo "Remoto: $REMOTE_SHA"
           if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
