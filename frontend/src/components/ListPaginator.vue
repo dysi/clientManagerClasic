@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import Paginator from "primevue/paginator";
-defineProps<{ page: number; size: number; total: number }>();
+withDefaults(defineProps<{ page: number; size: number; total: number; pageSizes?: number[] }>(), {
+  pageSizes: () => [25, 50, 100],
+});
 defineEmits<{ change: [page: number, size: number] }>();
 </script>
 <template>
@@ -8,7 +10,7 @@ defineEmits<{ change: [page: number, size: number] }>();
     :first="page * size"
     :rows="size"
     :total-records="total"
-    :rows-per-page-options="[25, 50, 100]"
+    :rows-per-page-options="pageSizes"
     template="PrevPageLink CurrentPageReport NextPageLink RowsPerPageDropdown"
     current-page-report-template="{first}–{last} de {totalRecords}"
     @page="$emit('change', $event.page, $event.rows)"

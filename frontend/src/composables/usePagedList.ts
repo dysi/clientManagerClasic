@@ -12,11 +12,12 @@ export function usePagedList<T>(
     string,
     string | number | null | undefined
   > = () => ({}),
+  initialSize = 50,
 ) {
   const rows = ref<T[]>([]) as Ref<T[]>;
   const keyword = ref("");
   const page = ref(0);
-  const size = ref(50);
+  const size = ref(initialSize);
   const total = ref(0);
   const loading = ref(false);
   const error = ref("");

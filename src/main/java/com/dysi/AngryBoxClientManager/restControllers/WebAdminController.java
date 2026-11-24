@@ -22,8 +22,10 @@ public class WebAdminController {
     @GetMapping("/licenses") public Page<LicenseView> licenses(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long clientId, @RequestParam(defaultValue = "ALL") String status,
             @RequestParam(defaultValue = "ACTIVE") String clientStatus, @RequestParam(defaultValue = "VISIBLE") String visibility,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return service.licenses(keyword, clientId, status, clientStatus, visibility, page, size);
+            @RequestParam(defaultValue = "ALL") String balanceState,
+            @RequestParam(required = false) java.math.BigDecimal minDebt,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "100") int size) {
+        return service.licenses(keyword, clientId, status, clientStatus, visibility, balanceState, minDebt, page, size);
     }
     @PutMapping("/licenses/{id}/visibility") public LicenseView visibility(@PathVariable long id, @Valid @RequestBody VisibilityInput input) { return service.visibility(id, input.hidden); }
 

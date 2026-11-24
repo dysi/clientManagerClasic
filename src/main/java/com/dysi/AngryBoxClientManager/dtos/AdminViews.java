@@ -16,6 +16,8 @@ public final class AdminViews {
     }
 
     public static class LicenseView {
+        public BigDecimal clientBalance;
+        public java.time.LocalDateTime balanceSynchronizedAt;
         public Long id, clientId, companyId;
         public String clientName, companyName, description, status;
         public LocalDate initialActivity, lockDate;
