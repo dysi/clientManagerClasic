@@ -52,7 +52,7 @@ class WebFrontendTests {
                 "lockDate", "2099-12-31", "prePayment", true));
     }
 
-    @Test void webListsDefaultToFiftyAndLicenseFiltersCombine() throws Exception {
+    @Test void webListSizesAndLicenseFiltersCombine() throws Exception {
         account(AuthorityName.ROLE_ADMIN); Browser browser = login();
         long first = newClient(browser, "Primero");
         long second = newClient(browser, "Segundo");
@@ -67,7 +67,7 @@ class WebFrontendTests {
                 .andExpect(jsonPath("$.content[0].licenseCounts.unknown").value(0));
         for (String resource : List.of("clients", "licenses", "payments", "users")) {
             mvc.perform(get("/web/api/" + resource).session(browser.session))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(50));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.size").value("licenses".equals(resource) ? 100 : 50));
         }
         mvc.perform(get("/web/api/licenses").session(browser.session).param("clientId", String.valueOf(first))
                 .param("keyword", "Empresa de prueba").param("status", "ACTIVE").param("size", "25"))
@@ -76,6 +76,52 @@ class WebFrontendTests {
         mvc.perform(get("/web/api/licenses").session(browser.session).param("clientId", String.valueOf(first))
                 .param("keyword", "No coincide").param("status", "ACTIVE"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        ClientAccountBalance debt = new ClientAccountBalance();
+        debt.setClient(em.getReference(Client.class, first)); debt.setAmount(new java.math.BigDecimal("20000.00"));
+        debt.setSynchronizedAt(java.time.LocalDateTime.of(2026, 11, 20, 10, 30)); em.persist(debt);
+        ClientAccountBalance zero = new ClientAccountBalance();
+        zero.setClient(em.getReference(Client.class, second)); zero.setAmount(java.math.BigDecimal.ZERO);
+        zero.setSynchronizedAt(debt.getSynchronizedAt()); em.persist(zero); em.flush();
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "DEBT")
+                .param("keyword", "Empresa de prueba").param("status", "ACTIVE").param("size", "200"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(200))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(license))
+                .andExpect(jsonPath("$.content[0].clientBalance").value(20000))
+                .andExpect(jsonPath("$.content[0].balanceSynchronizedAt").value("2026-11-20T10:30:00"));
+        for (String threshold : List.of("19999.99", "20000.00", "20000.01")) {
+            mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "DEBT")
+                    .param("minDebt", threshold).param("clientId", String.valueOf(first)).param("size", "200"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value("19999.99".equals(threshold) ? 1 : 0));
+        }
+        for (String invalid : List.of("-1", "0.001", "1000000000000", "texto")) {
+            mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "DEBT")
+                    .param("minDebt", invalid)).andExpect(status().isBadRequest());
+        }
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "NO_DEBT")
+                .param("minDebt", "1000")).andExpect(status().isBadRequest());
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "DEBT")
+                .param("clientId", String.valueOf(second)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "NO_DEBT"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].clientBalance").value(0));
+        zero.setAmount(new java.math.BigDecimal("-100.00")); em.flush();
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "NO_DEBT"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].clientBalance").value(-100));
+        zero.markRemoved(); em.flush();
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "UNKNOWN"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].clientBalance").isEmpty());
+        assertEquals(20000, write(browser, "PUT", "/web/api/licenses/" + license + "/lock",
+                java.util.Map.of("locked", false), 200).get("clientBalance").asInt());
+        JsonNode batch = write(browser, "PUT", "/web/api/licenses/batch",
+                java.util.Map.of("ids", List.of(license), "action", "UNBLOCK"), 200);
+        assertEquals(20000, batch.get(0).get("clientBalance").asInt());
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("size", "201")).andExpect(status().isBadRequest());
+        mvc.perform(get("/web/api/licenses").session(browser.session).param("balanceState", "INVALID")).andExpect(status().isBadRequest());
         mvc.perform(get("/web/api/licenses").session(browser.session).param("clientId", String.valueOf(first))
                 .param("keyword", "Empresa de prueba").param("status", "BLOCKED").param("size", "100"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));

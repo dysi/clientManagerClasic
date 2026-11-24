@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("licencias combina cliente, texto y estado; pagina 25/50/100 y resalta filas", async ({
+test("licencias combina cliente, texto y estado; pagina 25/50/100/200 y resalta filas", async ({
   page,
   context,
   baseURL,
@@ -73,7 +73,7 @@ test("licencias combina cliente, texto y estado; pagina 25/50/100 y resalta fila
     name: "Registros por página",
     exact: true,
   });
-  await expect(pageSize).toHaveText("50");
+  await expect(pageSize).toHaveText("100");
   await page
     .getByRole("combobox", { name: "Cliente", exact: true })
     .fill("Filtro Alfa");
@@ -94,7 +94,7 @@ test("licencias combina cliente, texto y estado; pagina 25/50/100 y resalta fila
   await expect(
     page.getByLabel("Buscar registros", { exact: true }),
   ).toHaveValue("Filtro licencia");
-  for (const size of [25, 100, 50]) {
+  for (const size of [25, 100, 50, 200]) {
     const response = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return (

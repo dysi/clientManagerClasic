@@ -25,7 +25,7 @@ public final class AdminInputs {
     public enum LicenseBatchAction { LOCK_DATE, BLOCK, UNBLOCK }
 
     public static class LicenseBatchInput {
-        @NotEmpty @Size(max = 100) public List<@NotNull @Positive Long> ids;
+        @NotEmpty @Size(max = 200) public List<@NotNull @Positive Long> ids;
         @NotNull public LicenseBatchAction action;
         public LocalDate lockDate;
     }

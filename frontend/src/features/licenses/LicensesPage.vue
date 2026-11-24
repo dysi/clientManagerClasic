@@ -8,6 +8,7 @@ import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
 import Select from "primevue/select";
+import InputNumber from "primevue/inputnumber";
 import { useToast } from "primevue/usetoast";
 import PageHeader from "../../components/PageHeader.vue";
 import ListToolbar from "../../components/ListToolbar.vue";
@@ -23,12 +24,21 @@ import type { License } from "../../services/admin";
 import { clientsApi } from "../clients/api";
 import LicenseEditor from "./LicenseEditor.vue";
 import LicenseBatchDialog from "./LicenseBatchDialog.vue";
+import { money, displayDateTime } from "../../services/format";
 const route = useRoute();
 const toast = useToast();
 const confirm = useConfirmAction();
 const status = ref("ALL");
 const clientStatus = ref("ACTIVE");
 const visibility = ref("VISIBLE");
+const balanceState = ref("ALL");
+const minDebt = ref<number | null>(null);
+const balanceOptions = [
+  { label: "Todos", value: "ALL" },
+  { label: "Con deuda", value: "DEBT" },
+  { label: "Sin deuda", value: "NO_DEBT" },
+  { label: "Saldo sin informar", value: "UNKNOWN" },
+];
 const clientStates = [
   { label: "Todos", value: "ALL" }, { label: "Activos", value: "ACTIVE" },
   { label: "Dados de baja", value: "REMOVED" },
@@ -90,7 +100,13 @@ const {
   clientStatus: clientStatus.value,
   visibility: visibility.value,
   clientId: clientId.value,
-}));
+  balanceState: balanceState.value,
+  minDebt: balanceState.value === "DEBT" && minDebt.value != null ? minDebt.value.toFixed(2) : null,
+}), 100);
+function changeBalanceFilter() {
+  if (balanceState.value !== "DEBT") minDebt.value = null;
+  void search();
+}
 // Una selección nunca se traslada silenciosamente a otra búsqueda o página.
 watch(loading, value => { if (value) selected.value = []; }, { flush: "sync" });
 onMounted(async () => {
@@ -177,7 +193,7 @@ async function changeVisibility(license: License) {
         :loading="loading"
         placeholder="Empresa o cliente"
         @search="search"
-        ><div class="flex w-full flex-wrap items-end gap-3">
+        ><div class="flex w-full flex-col gap-3"><div class="flex flex-wrap items-end gap-3">
           <FormField
             id="license-client-filter"
             label="Cliente"
@@ -217,7 +233,20 @@ async function changeVisibility(license: License) {
               option-value="value"
               aria-label="Estado de licencia"
               @change="search"
-          /></FormField></div
+          /></FormField></div>
+          <div class="flex flex-wrap items-start gap-3">
+            <FormField id="license-balance-filter" label="Deuda del cliente">
+              <Select input-id="license-balance-filter" v-model="balanceState" :options="balanceOptions"
+                aria-label="Deuda del cliente" option-label="label" option-value="value" @change="changeBalanceFilter" />
+            </FormField>
+            <FormField v-if="balanceState === 'DEBT'" id="license-min-debt" label="Deuda mayor a"
+              hint="Opcional. Excluye deudas iguales o menores al importe." class="w-full sm:w-72" v-slot="field">
+              <InputNumber v-model="minDebt" input-id="license-min-debt" mode="currency" currency="ARS" locale="es-AR"
+                :min="0" :max="999999999999.99" :min-fraction-digits="2" :max-fraction-digits="2"
+                placeholder="Cualquier deuda positiva" :aria-describedby="field.describedby" fluid
+                @blur="search" @keydown.enter.prevent="search" />
+            </FormField>
+          </div></div
       ></ListToolbar>
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <Button type="button" :label="selectionMode ? 'Cancelar selección' : 'Seleccionar licencias'"
@@ -271,7 +300,15 @@ async function changeVisibility(license: License) {
         >
         <Column header="Estado"
           ><template #body="{ data }"
-            ><LicenseStatus :status="data.status" /></template
+            ><LicenseStatus :status="data.status" />
+            <div class="mt-2 text-sm">
+              <template v-if="data.clientBalance != null">
+                <p :aria-label="`Saldo del cliente: ${money(data.clientBalance)}`" class="whitespace-nowrap font-medium">{{ money(data.clientBalance) }}</p>
+                <p v-if="data.clientBalance < 0" class="text-muted-color">Saldo a favor</p>
+                <p class="mt-1 text-xs text-muted-color">Saldo al {{ displayDateTime(data.balanceSynchronizedAt) }}</p>
+              </template>
+              <p v-else class="text-muted-color">Saldo sin informar</p>
+            </div></template
         ></Column>
         <Column header="Acciones"
           ><template #body="{ data }"
@@ -312,6 +349,7 @@ async function changeVisibility(license: License) {
         :page="page"
         :size="size"
         :total="total"
+        :page-sizes="[25, 50, 100, 200]"
         @change="paginate"
       /> </template
   ></Card>

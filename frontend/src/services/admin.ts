@@ -9,6 +9,8 @@ export function paymentCounts(params: URLSearchParams) {
   return request<PaymentCounts>(`/web/api/payments/counts?${params}`);
 }
 export interface License {
+  clientBalance: number | null;
+  balanceSynchronizedAt: string | null;
   id: number;
   clientId: number;
   clientName: string;

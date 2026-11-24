@@ -31,11 +31,13 @@ public class WebAdminService {
     private final UserRepository users;
     private final AuthorityRepository authorities;
     private final PasswordEncoder passwords;
+    private final ClientAccountBalanceRepository balances;
 
     public WebAdminService(ClientRepository clients, LicenseRepository licenses, PaymentRepository payments,
-            UserRepository users, AuthorityRepository authorities, PasswordEncoder passwords) {
+            UserRepository users, AuthorityRepository authorities, PasswordEncoder passwords, ClientAccountBalanceRepository balances) {
         this.clients = clients; this.licenses = licenses; this.payments = payments;
         this.users = users; this.authorities = authorities; this.passwords = passwords;
+        this.balances = balances;
     }
 
     public Page<LicenseView> licenses(String keyword, Long clientId, String status, int page, int size) {
@@ -44,9 +46,23 @@ public class WebAdminService {
 
     public Page<LicenseView> licenses(String keyword, Long clientId, String status, String clientStatus,
             String visibility, int page, int size) {
+        return licenses(keyword, clientId, status, clientStatus, visibility, "ALL", page, size);
+    }
+
+    public Page<LicenseView> licenses(String keyword, Long clientId, String status, String clientStatus,
+            String visibility, String balanceState, int page, int size) {
+        return licenses(keyword, clientId, status, clientStatus, visibility, balanceState, null, page, size);
+    }
+
+    public Page<LicenseView> licenses(String keyword, Long clientId, String status, String clientStatus,
+            String visibility, String balanceState, java.math.BigDecimal minDebt, int page, int size) {
+        if (!Set.of("ALL", "DEBT", "NO_DEBT", "UNKNOWN").contains(balanceState)) bad("Filtro de deuda inválido.");
+        if (minDebt != null && (!"DEBT".equals(balanceState) || minDebt.signum() < 0 || minDebt.scale() > 2
+                || minDebt.compareTo(new java.math.BigDecimal("999999999999.99")) > 0))
+            bad("Ingresá un monto de deuda no negativo con hasta 12 enteros y 2 decimales, usando el filtro Con deuda.");
         if (!Set.of("ALL", "ACTIVE", "REMOVED").contains(clientStatus)
                 || !Set.of("ALL", "VISIBLE", "HIDDEN").contains(visibility)) bad("Filtros de licencia inválidos.");
-        Pageable paging = page(page, size, keyword, "companyName", "id");
+        Pageable paging = pageWithLimit(page, size, keyword, 200, "companyName", "id");
         if (!Set.of("ALL", "ACTIVE", "EXPIRING", "EXPIRED", "BLOCKED").contains(status)) bad("Estado de licencia inválido.");
         Specification<License> specification = (root, query, cb) -> {
             List<Predicate> filters = new ArrayList<>();
@@ -58,6 +74,19 @@ public class WebAdminService {
                     ? cb.isNull(client.get("removeDate")) : cb.isNotNull(client.get("removeDate")));
             if (!"ALL".equals(visibility)) filters.add(cb.equal(root.get("hidden"), "HIDDEN".equals(visibility)));
             if (clientId != null) filters.add(cb.equal(client.get("id"), clientId));
+            if (!"ALL".equals(balanceState)) {
+                Subquery<Long> balanceQuery = query.subquery(Long.class);
+                Root<ClientAccountBalance> balance = balanceQuery.from(ClientAccountBalance.class);
+                List<Predicate> balanceFilters = new ArrayList<>();
+                balanceFilters.add(cb.equal(balance.get("client"), client));
+                balanceFilters.add(cb.isNull(balance.get("removeDate")));
+                // Umbral exclusivo: una deuda igual al importe ingresado queda fuera.
+                if ("DEBT".equals(balanceState)) balanceFilters.add(cb.greaterThan(balance.get("amount"),
+                        minDebt == null ? java.math.BigDecimal.ZERO : minDebt));
+                if ("NO_DEBT".equals(balanceState)) balanceFilters.add(cb.lessThanOrEqualTo(balance.get("amount"), java.math.BigDecimal.ZERO));
+                balanceQuery.select(balance.get("id")).where(balanceFilters.toArray(new Predicate[0]));
+                filters.add("UNKNOWN".equals(balanceState) ? cb.not(cb.exists(balanceQuery)) : cb.exists(balanceQuery));
+            }
             if (!"ALL".equals(status)) {
                 Join<License, LicenseStatus> state = root.join("licenseStatuses");
                 Subquery<Long> first = query.subquery(Long.class);
@@ -77,10 +106,12 @@ public class WebAdminService {
             }
             return cb.and(filters.toArray(new Predicate[0]));
         };
-        return licenses.findAll(specification, paging).map(WebAdminService::licenseView);
+        Page<LicenseView> result = licenses.findAll(specification, paging).map(WebAdminService::licenseView);
+        withClientBalances(result.getContent());
+        return result;
     }
 
-    public LicenseView license(long id) { return licenseView(findLicense(id)); }
+    public LicenseView license(long id) { return adminLicenseView(findLicense(id)); }
 
     @Transactional
     public LicenseView saveLicense(Long id, LicenseInput input) {
@@ -100,7 +131,7 @@ public class WebAdminService {
             license.getLicenseStatuses().add(state);
         }
         state.setLockDate(calendar(input.lockDate));
-        return licenseView(licenses.saveAndFlush(license));
+        return adminLicenseView(licenses.saveAndFlush(license));
     }
 
     @Transactional
@@ -110,7 +141,7 @@ public class WebAdminService {
         if (state == null) conflict("La licencia no tiene estado. Completá sus datos antes de bloquearla.");
         state.setForcedLock(locked);
         licenses.saveAndFlush(license);
-        return licenseView(license);
+        return adminLicenseView(license);
     }
 
     /** Aplica el campo elegido a la selección completa o revierte todo ante un error. */
@@ -142,7 +173,7 @@ public class WebAdminService {
         }
         licenses.saveAll(selected);
         licenses.flush();
-        return selected.stream().map(WebAdminService::licenseView).collect(Collectors.toList());
+        return withClientBalances(selected.stream().map(WebAdminService::licenseView).collect(Collectors.toList()));
     }
 
     @Transactional
@@ -152,7 +183,7 @@ public class WebAdminService {
         if (hidden && !license.isHidden() && (state == null || !state.isForcedLock()))
             conflict("Solo podés ocultar una licencia con bloqueo forzado.");
         license.setHidden(hidden);
-        return licenseView(licenses.saveAndFlush(license));
+        return adminLicenseView(licenses.saveAndFlush(license));
     }
 
     public Page<PaymentView> payments(String keyword, Long licenseId, String status, int page, int size) {
@@ -378,6 +409,26 @@ public class WebAdminService {
                 .map(l -> new Option(l.id, l.companyName + " · Empresa #" + l.companyId)).collect(Collectors.toList());
     }
 
+    private LicenseView adminLicenseView(License license) {
+        return withClientBalances(List.of(licenseView(license))).get(0);
+    }
+
+    /** Una consulta de saldos por página/lote; también conserva el saldo al reemplazar filas tras guardar. */
+    private List<LicenseView> withClientBalances(List<LicenseView> views) {
+        Set<Long> ids = views.stream().map(view -> view.clientId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) return views;
+        Map<Long, ClientAccountBalance> byClient = balances.findByClientIdInAndRemoveDateIsNull(ids).stream()
+                .collect(Collectors.toMap(balance -> balance.getClient().getId(), balance -> balance));
+        for (LicenseView view : views) {
+            ClientAccountBalance balance = byClient.get(view.clientId);
+            if (balance != null) {
+                view.clientBalance = balance.getAmount();
+                view.balanceSynchronizedAt = balance.getSynchronizedAt();
+            }
+        }
+        return views;
+    }
+
     static LicenseView licenseView(License license) {
         LicenseView view = new LicenseView();
         view.hidden = license.isHidden();
@@ -427,7 +478,10 @@ public class WebAdminService {
     private static String pattern(String keyword) { return "%" + keyword.trim().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"; }
     private static Predicate like(CriteriaBuilder cb, Expression<String> field, String keyword) { return cb.like(cb.lower(cb.coalesce(field, "")), pattern(keyword), '!'); }
     private static Pageable page(int page, int size, String keyword, String... sort) {
-        if (page < 0 || size < 1 || size > 100 || page > Integer.MAX_VALUE / size || keyword.length() > 150) bad("Parámetros de búsqueda inválidos.");
+        return pageWithLimit(page, size, keyword, 100, sort);
+    }
+    private static Pageable pageWithLimit(int page, int size, String keyword, int maxSize, String... sort) {
+        if (page < 0 || size < 1 || size > maxSize || page > Integer.MAX_VALUE / size || keyword.length() > 150) bad("Parámetros de búsqueda inválidos.");
         return PageRequest.of(page, size, Sort.by(sort));
     }
     private static void checkPassword(String password) {

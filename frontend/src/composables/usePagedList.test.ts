@@ -7,7 +7,7 @@ import { usePagedList } from "./usePagedList";
 vi.mock("../services/http", () => ({ request: vi.fn() }));
 
 describe("Listados paginados", () => {
-  it("inicia con 50 registros y conserva los filtros al cambiar tamaño y buscar", async () => {
+  it("permite iniciar en 100 registros y conserva los filtros al cambiar tamaño y buscar", async () => {
     vi.mocked(request).mockResolvedValue({ content: [], totalElements: 0 });
     let list!: ReturnType<typeof usePagedList>;
     const wrapper = mount(
@@ -16,24 +16,26 @@ describe("Listados paginados", () => {
           list = usePagedList("/web/api/licenses", () => ({
             clientId: 7,
             status: "ACTIVE",
-          }));
+            balanceState: "DEBT",
+            minDebt: "1000.00",
+          }), 100);
           return () => null;
         },
       }),
     );
     await flushPromises();
     expect(request).toHaveBeenLastCalledWith(
-      "/web/api/licenses?keyword=&page=0&size=50&clientId=7&status=ACTIVE",
+      "/web/api/licenses?keyword=&page=0&size=100&clientId=7&status=ACTIVE&balanceState=DEBT&minDebt=1000.00",
     );
     await list.paginate(2, 25);
     list.keyword.value = " Empresa ";
     await list.search();
     expect(request).toHaveBeenLastCalledWith(
-      "/web/api/licenses?keyword=Empresa&page=0&size=25&clientId=7&status=ACTIVE",
+      "/web/api/licenses?keyword=Empresa&page=0&size=25&clientId=7&status=ACTIVE&balanceState=DEBT&minDebt=1000.00",
     );
-    await list.paginate(0, 100);
+    await list.paginate(0, 200);
     expect(request).toHaveBeenLastCalledWith(
-      "/web/api/licenses?keyword=Empresa&page=0&size=100&clientId=7&status=ACTIVE",
+      "/web/api/licenses?keyword=Empresa&page=0&size=200&clientId=7&status=ACTIVE&balanceState=DEBT&minDebt=1000.00",
     );
     wrapper.unmount();
   });
