@@ -1,0 +1,107 @@
+name: Deploy a producción (clientmanager)
+
+on:
+  push:
+    tags:
+      - 'prod_v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      jar_sha256: ${{ steps.checksum.outputs.sha256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verificar que el tag desciende de master
+        run: |
+          git fetch origin master --depth=1
+          if ! git merge-base --is-ancestor "${{ github.sha }}" origin/master; then
+            echo "::error::El tag ${{ github.ref_name }} no apunta a un commit de master. Abortando."
+            exit 1
+          fi
+
+      - name: Configurar JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Build (mvnw package; incluye frontend Vite/Node y tests aislados con H2)
+        run: ./mvnw -B package
+
+      - name: Checksum del jar
+        id: checksum
+        run: |
+          JAR=target/clientmanager-0.0.1-SNAPSHOT.jar
+          sha256sum "$JAR"
+          echo "sha256=$(sha256sum "$JAR" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Subir artefacto al workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: clientmanager-jar
+          path: target/clientmanager-0.0.1-SNAPSHOT.jar
+          retention-days: 14
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Descargar artefacto
+        uses: actions/download-artifact@v4
+        with:
+          name: clientmanager-jar
+          path: dist
+
+      - name: Verificar checksum del artefacto descargado
+        run: |
+          echo "${{ needs.build.outputs.jar_sha256 }}  dist/clientmanager-0.0.1-SNAPSHOT.jar" | sha256sum -c -
+
+      - name: Preparar SSH (key, known_hosts fijo, config con compat ssh-rsa)
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SERVER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host prodserver
+            HostName dysi.com.ar
+            User deploy
+            IdentityFile ~/.ssh/id_deploy
+            HostKeyAlgorithms +ssh-rsa
+            PubkeyAcceptedAlgorithms +ssh-rsa
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Subir jar al servidor (a cuarentena, no pisa nada todavía)
+        run: |
+          scp dist/clientmanager-0.0.1-SNAPSHOT.jar prodserver:/home/deploy/incoming/clientmanager-0.0.1-SNAPSHOT.jar.new
+
+      - name: Verificar integridad en el servidor antes de tocar el servicio
+        run: |
+          REMOTE_SHA=$(ssh prodserver "sha256sum /home/deploy/incoming/clientmanager-0.0.1-SNAPSHOT.jar.new | cut -d' ' -f1")
+          LOCAL_SHA="${{ needs.build.outputs.jar_sha256 }}"
+          echo "Local:  $LOCAL_SHA"
+          echo "Remoto: $REMOTE_SHA"
+          if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+            echo "::error::Checksum no coincide, abortando antes de tocar el servicio."
+            exit 1
+          fi
+
+      - name: Swap + healthcheck + rollback automático (vía sudo, script fijo en el server)
+        run: |
+          ssh prodserver "sudo /usr/local/sbin/deploy-clientmanager.sh"
+
+      - name: Mostrar log del deploy en el servidor
+        if: always()
+        run: |
+          ssh prodserver "tail -n 30 /var/log/clientmanager-deploy.log" || true
