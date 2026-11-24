@@ -18,7 +18,9 @@ LOG="/var/log/clientmanager-deploy.log"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 check_health() {
-    curl -s -o /dev/null -w '%{http_code}' "$HEALTHCHECK_URL" 2>/dev/null || echo "000"
+    local code
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$HEALTHCHECK_URL" 2>/dev/null)
+    echo "${code:-000}"
 }
 
 if [ ! -f "$INCOMING" ]; then
