@@ -41,15 +41,16 @@ public class WebSessionSecurityConfig extends WebSecurityConfigurerAdapter {
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED).and()
                 .authorizeRequests()
                 .antMatchers(HttpMethod.GET, "/", "/ui", "/ui/**", "/users/login", "/web/session/csrf", "/web/session/support", "/web/session/turnstile").permitAll()
-                .antMatchers(HttpMethod.POST, "/web/session/login", "/web/session/document").permitAll()
+                .antMatchers(HttpMethod.POST, "/web/session/login", "/web/session/document", "/web/session/portal-access").permitAll()
                 .antMatchers(HttpMethod.GET, "/web/session").authenticated()
                 .antMatchers(HttpMethod.GET, "/web/portal/context", "/web/portal/overview", "/web/portal/licenses",
                         "/web/portal/accounts", "/web/portal/payment-form", "/web/portal/payments",
                         "/web/portal/payments/*/comments", "/web/portal/payments/*", "/web/portal/payments/*/attachments",
                         "/web/portal/payments/*/attachments/*").hasAuthority("PORTAL_VIEW")
-                .antMatchers(HttpMethod.POST, "/web/portal/payments", "/web/portal/payments/*/attachments").hasAuthority("PORTAL_SUBMIT")
+                .antMatchers(HttpMethod.POST, "/web/portal/payments", "/web/portal/payments/*/attachments", "/web/portal/license-extension").hasAuthority("PORTAL_SUBMIT")
                 .antMatchers(HttpMethod.POST, "/web/portal/payments/*/comments").hasAuthority("PORTAL_COMMENT")
                 .antMatchers("/web/portal/**").denyAll()
+                .antMatchers("/api/portal-access/**").denyAll()
                 .antMatchers("/web/api/**", "/index/**", "/users/create/**", "/users/edit/**").hasRole("ADMIN")
                 .anyRequest().hasRole("ADMIN").and()
                 .exceptionHandling()

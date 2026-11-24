@@ -114,23 +114,26 @@ Antes de cambiar estas reglas, leer servicios, entidades, repositorios, DTO y pr
 - UPDATE/DELETE masivos JPQL, SQL nativo y SQL externo eluden los listeners JPA. Evitarlos para operaciones de negocio o actualizar la auditoría explícitamente y verificar el resultado. La anulación no es un DELETE físico ni un historial completo de todas las versiones del registro.
 - Agregar el script MySQL correspondiente al introducir una entidad o modificar sus campos; las referencias de auditoría no deben tener cascada de persistencia/eliminación sobre el usuario.
 
-### Scripts de cambios de base de datos
+### Migraciones de base de datos con Liquibase
 
-- Siempre que se altere la base de datos, agregar un script nuevo de queries MySQL en `src/main/resources/db/`.
-- Formato obligatorio: `yyyyMMdd-NN-descripcion-breve.sql`. Usar la fecha del cambio, secuencia de al menos dos dígitos y descripción breve con guiones; por ejemplo `20261026-01-auditoria-entidades.sql`.
-- La secuencia comienza en `01` para cada fecha. Antes de crear un script, revisar todos los archivos de ese día y utilizar el número siguiente al mayor existente. No repetir números ni renumerar archivos anteriores.
-- La ejecución se ordena por fecha y valor numérico de la secuencia: `yyyyMMdd-01-...`, `yyyyMMdd-02-...`, `yyyyMMdd-03-...`. No sobrescribir scripts ya versionados o aplicados; corregir mediante uno nuevo.
-- Son scripts manuales versionados: no existe un ejecutor automático de migraciones. No incorporarlos a `schema.sql`, `data.sql` ni al arranque automático de Spring para ejecutarlos incidentalmente.
-- Incluir alcance, precondiciones de esquema/motor/tipos, conservación de datos y consultas de verificación. MySQL hace commit implícito de DDL; no prometer rollback transaccional global de una serie de ALTER TABLE.
-- Ejecutar primero sobre una copia compatible de MySQL y documentar limitaciones. Generar un script no autoriza aplicarlo a una base compartida o de producción.
+- Todo cambio futuro de esquema o datos de referencia requiere una migración en `src/main/resources/db/changelog/changes/`, no un SQL manual nuevo en `src/main/resources/db/`. Crear la subcarpeta con la primera migración.
+- Usar SQL formateado Liquibase: primera línea `--liquibase formatted sql` y changesets con autor estable, ID único y `dbms:mysql`. Nombre: `yyyyMMdd-NN-descripcion-breve.sql`; revisar la secuencia del día y usar el siguiente número sin repetir ni renumerar.
+- Registrar cada archivo mediante un `include` explícito en `src/main/resources/db/changelog/db.changelog-master.xml`, con `relativeToChangelogFile="true"`, en orden de dependencias. No usar `includeAll`: el orden debe ser revisable.
+- Conservar ruta, autor, ID y contenido de los changesets aplicados; corregir con una nueva migración. No usar `runAlways`, `runOnChange`, limpieza de checksums ni `MARK_RAN` para ocultar incompatibilidades.
+- Mantener changesets pequeños con intención, conservación de datos y verificaciones. Usar precondiciones compatibles con la versión administrada por Spring Boot (por ejemplo `sql-check` en SQL formateado); detener con HALT ante incompatibilidades.
+- Incluir rollback explícito cuando sea viable; si no es reversible, documentar motivo, respaldo y recuperación. MySQL confirma DDL implícitamente: no prometer rollback transaccional global ni mezclar DDL y cambios de datos en un mismo changeset.
+- Para procedimientos o triggers configurar delimitadores y splitting compatibles con Liquibase/JDBC; no copiar `DELIMITER`, que es una orden del cliente MySQL.
+- Los SQL históricos de `src/main/resources/db/` se consideran ya ejecutados. No moverlos, reescribirlos, incluirlos ni marcarlos como ejecutados con un baseline. El changelog inicial está vacío y no crea una base desde cero.
+- Validar primero sobre una copia compatible de MySQL, incluidas precondiciones, actualización y recuperación. H2 no demuestra compatibilidad MySQL. Generar una migración no autoriza aplicarla sobre una base compartida o de producción.
+- No incorporar `schema.sql`/`data.sql` ni otro inicializador paralelo.
 
 ### Transacciones y esquema
 
 - Definir transacciones en servicios y usar `@Transactional(readOnly = true)` para lecturas. Las operaciones compuestas de asociaciones deben ser atómicas.
 - Revisar lado propietario, cascadas y `orphanRemoval` antes de cambiar relaciones. No resolver N+1 convirtiendo todas las asociaciones a EAGER.
 - Preservar nombres físicos y comportamiento de generadores de IDs necesarios para el esquema existente.
-- No hay Liquibase ni Flyway configurado. Los cambios de esquema se versionan como scripts MySQL manuales en `src/main/resources/db/`, según la convención anterior.
-- `ddl-auto=update` está presente en la configuración normal y puede modificar MySQL. Antes de ejecutar la aplicación, verificar el destino y las propiedades efectivas; no usar una base compartida para pruebas.
+- Liquibase ejecuta los cambios pendientes al arrancar, antes de JPA, desde el changelog maestro. No incorporar ejecutores paralelos.
+- Normal y dev usan `ddl-auto=validate`; no habilitar `update` para suplir migraciones. Verificar destino y propiedades efectivas antes de arrancar: Liquibase puede modificar MySQL. Test usa H2 aislada, `create-drop` y Liquibase deshabilitado.
 - Un cambio de esquema requiere definir migración reproducible, compatibilidad con datos existentes y validación; H2 no demuestra por sí solo compatibilidad con MySQL.
 - No recrear bases con datos, ejecutar restauraciones ni aplicar correcciones destructivas sin autorización explícita y estrategia de recuperación.
 

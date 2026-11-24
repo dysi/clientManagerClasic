@@ -1,5 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import PrimeVue from "primevue/config";
 import ToastService from "primevue/toastservice";
 vi.mock("../../composables/useConfirmAction", () => ({
@@ -9,6 +9,27 @@ import ClientEditor from "./ClientEditor.vue";
 import { clientsApi, type Client } from "./api";
 import { ApiError } from "../../services/http";
 
+beforeEach(() => {
+  // APIs de layout usadas por PrimeVue que jsdom no implementa.
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  });
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
+  }));
+  vi.spyOn(clientsApi, "countries").mockResolvedValue([{ id: 19, name: "Argentina", countryId: null }]);
+  vi.spyOn(clientsApi, "provinces").mockResolvedValue([{ id: 83, name: "Mendoza", countryId: 19 }]);
+});
+
 const client: Client = {
   removed: false,
   id: 7,
@@ -16,13 +37,15 @@ const client: Client = {
   lastname: "Pérez",
   email: "ana@example.test",
   phone: "123456",
-  cuil: "20123456789",
+  cuil: "20123456786",
   username: "ana",
   dni: "12345678",
   legalName: null,
   tradeName: null,
   externalCode: null,
   portalUserMissing: false,
+  userCount: 1,
+  licenseCounts: { total: 0, active: 0, expired: 0, blocked: 0, unknown: 0 },
 };
 function editor() {
   return mount(ClientEditor, {
@@ -47,6 +70,8 @@ describe("Edición de clientes", () => {
     const save = vi.spyOn(clientsApi, "save").mockResolvedValue(client);
     const wrapper = editor();
     await wrapper.get("#lastname").setValue("Gómez");
+    await wrapper.get("#street").setValue("Calle de prueba");
+    await wrapper.get("#observations").setValue("Recibir por la tarde");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
     expect(save).toHaveBeenCalledWith(
@@ -55,11 +80,20 @@ describe("Edición de clientes", () => {
         lastname: "Gómez",
         email: "ana@example.test",
         phone: "123456",
-        cuil: "20123456789",
+        cuil: "20123456786",
         dni: "12345678",
         legalName: "",
         tradeName: "",
         externalCode: "",
+        street: "Calle de prueba",
+        streetNumber: "",
+        addressComplement: "",
+        neighborhood: "",
+        city: "",
+        postalCode: "",
+        observations: "Recibir por la tarde",
+        countryId: 0,
+        provinceId: 0,
       },
       7,
     );

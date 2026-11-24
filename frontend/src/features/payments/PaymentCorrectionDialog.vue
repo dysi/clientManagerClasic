@@ -7,6 +7,7 @@ import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
 import AutoComplete from "primevue/autocomplete";
 import Message from "primevue/message";
+import PaymentSyncWarning from "./PaymentSyncWarning.vue";
 import Select from "primevue/select";
 import FormField from "../../components/FormField.vue";
 import DateInput from "../../components/DateInput.vue";
@@ -55,14 +56,15 @@ async function submit() {
       issuedAt: `${form.value.issuedDate}T${form.value.issuedTime}`, contactPhone: form.value.contactPhone.trim(),
       licenseId: form.value.licenseId, reason: form.value.reason.trim(),
       bankAccountId: form.value.destination?.id ?? null, accountRevision: form.value.destination?.revision ?? null })
-  }), "Se corrigieron los datos del pago pendiente.");
+  }), "Se corrigieron los datos del pago.");
   if (result) emit("saved", result);
 }
 </script>
 <template>
-  <Dialog :visible="true" modal header="Editar pago pendiente" class="w-[min(42rem,calc(100vw-2rem))]" :closable="!saving" :close-on-escape="!saving" @update:visible="!$event && close()">
+  <Dialog :visible="true" modal header="Editar pago" class="w-[min(42rem,calc(100vw-2rem))]" :closable="!saving" :close-on-escape="!saving" @update:visible="!$event && close()">
     <form id="correctPayment" class="flex flex-col gap-4" :aria-busy="saving" @submit.prevent="submit">
-      <Message severity="info" :closable="false">La corrección queda registrada con tu usuario y el motivo. Guardar mantiene el pago pendiente; después podés aprobarlo.</Message>
+      <Message severity="info" :closable="false">La corrección queda registrada con tu usuario y el motivo. Guardar conserva el estado actual del pago.</Message>
+      <PaymentSyncWarning :synchronized-at="detail.payment.angryboxSynchronizedAt" />
       <Message v-if="error" severity="error" role="alert">{{ error }}</Message>
       <FormField id="correctionAmount" label="Importe en ARS" required :error="fields.amount" v-slot="field">
         <InputNumber input-id="correctionAmount" v-model="form.amount" mode="currency" currency="ARS" locale="es-AR" :min="0.01" :max="999999999999.99" :min-fraction-digits="2" :max-fraction-digits="2" :disabled="saving" :invalid="field.invalid" :input-props="{ 'aria-describedby': field.describedby }" fluid />

@@ -23,13 +23,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class WebClientReadService {
     private final ClientRepository clients;
     private final ClientAccountBalanceRepository balances;
+    private final com.dysi.AngryBoxClientManager.repositories.LicenseRepository licenses;
+    private final com.dysi.AngryBoxClientManager.repositories.UserRepository users;
 
     private final ZoneId balanceZone;
 
     public WebClientReadService(ClientRepository clients, ClientAccountBalanceRepository balances,
+            com.dysi.AngryBoxClientManager.repositories.UserRepository users,
+            com.dysi.AngryBoxClientManager.repositories.LicenseRepository licenses,
             @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String balanceZone) {
         this.clients = clients;
         this.balances = balances;
+        this.users = users;
+        this.licenses = licenses;
         this.balanceZone = ZoneId.of(balanceZone);
     }
 
@@ -47,7 +53,18 @@ public class WebClientReadService {
         if (!result.isEmpty()) balances.findByClientIdInAndRemoveDateIsNull(result.getContent().stream()
                 .map(Client::getId).collect(Collectors.toList()))
                 .forEach(balance -> byClient.put(balance.getClient().getId(), balance));
-        return result.map(client -> new WebClientView(client, byClient.get(client.getId())));
+        Map<Long, Long> counts = new HashMap<>();
+        if (!result.isEmpty()) users.countForClients(result.getContent().stream().map(Client::getId).collect(Collectors.toList()))
+                .forEach(count -> counts.put(count.getClientId(), count.getTotal()));
+        Map<Long, WebClientView.LicenseCounts> licenseCounts = new HashMap<>();
+        if (!result.isEmpty()) licenses.countForClients(result.getContent().stream().map(Client::getId).collect(Collectors.toList()), tomorrow())
+                .forEach(count -> licenseCounts.put(count.getClientId(), new WebClientView.LicenseCounts(count)));
+        return result.map(client -> {
+            WebClientView view = new WebClientView(client, byClient.get(client.getId()));
+            view.userCount = counts.getOrDefault(client.getId(), 0L);
+            view.licenseCounts = licenseCounts.getOrDefault(client.getId(), new WebClientView.LicenseCounts());
+            return view;
+        });
     }
 
     /** La baja reutiliza el evento y actor de auditoría, sin alterar licencias. */
@@ -61,6 +78,16 @@ public class WebClientReadService {
     }
 
     public WebClientView view(Client client) {
-        return new WebClientView(client, balances.findByClientIdAndRemoveDateIsNull(client.getId()).orElse(null));
+        WebClientView view = new WebClientView(client, balances.findByClientIdAndRemoveDateIsNull(client.getId()).orElse(null));
+        view.userCount = users.countForClients(java.util.List.of(client.getId())).stream()
+                .mapToLong(com.dysi.AngryBoxClientManager.repositories.UserRepository.ClientUserCount::getTotal).findFirst().orElse(0);
+        licenses.countForClients(java.util.List.of(client.getId()), tomorrow()).stream().findFirst()
+                .ifPresent(count -> view.licenseCounts = new WebClientView.LicenseCounts(count));
+        return view;
+    }
+
+    private static java.util.Calendar tomorrow() {
+        return java.util.GregorianCalendar.from(java.time.LocalDate.now().plusDays(1)
+                .atStartOfDay(ZoneId.systemDefault()));
     }
 }

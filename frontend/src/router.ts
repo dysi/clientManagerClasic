@@ -12,6 +12,7 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: "/", redirect: entryPath },
+    { path: "/portal-access", component: () => import("./features/auth/PortalAccessPage.vue") },
     {
       path: "/access",
       component: () => import("./features/auth/LoginPage.vue"),
@@ -100,6 +101,7 @@ export const router = createRouter({
   ],
 });
 router.beforeEach((to) => {
+  if (to.path === "/portal-access") return;
   const publicEntry = to.path === "/login" || to.path === "/access";
   if (!publicEntry && !session.user) return loginLocation(to.fullPath);
   if (publicEntry && session.user)

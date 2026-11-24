@@ -4,8 +4,10 @@ import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
+import PaymentSyncWarning from "./PaymentSyncWarning.vue";
 import Skeleton from "primevue/skeleton";
 import Tag from "primevue/tag";
+import Textarea from "primevue/textarea";
 import DateInput from "../../components/DateInput.vue";
 import FormField from "../../components/FormField.vue";
 import LicenseStatus from "../../components/LicenseStatus.vue";
@@ -17,7 +19,7 @@ const props = defineProps<{ detail: ReviewDetail }>();
 const emit = defineEmits<{ close: []; approved: [] }>();
 const confirm = useConfirmAction();
 interface Selection { license: LicenseOption; editable: boolean; unlock: boolean; updateExpiry: boolean; lockDate: string | null; confirmShortening: boolean }
-const draft = ref<{ updateAll: boolean; commonDate: string | null; selections: Selection[] }>({ updateAll: true, commonDate: null, selections: [] });
+const draft = ref<{ reason: string; updateAll: boolean; commonDate: string | null; selections: Selection[] }>({ reason: "", updateAll: true, commonDate: null, selections: [] });
 const { saving, error, save, dirty, reset } = useDraft(draft);
 const loading = ref(false), loadError = ref(""), loaded = ref(false), today = ref("");
 const step = ref<"adjust" | "review">("adjust");
@@ -95,7 +97,7 @@ async function review() {
   } catch (failure) { if (active && current === sequence) error.value = failure instanceof Error ? failure.message : "No se pudo preparar la revisión."; }
   finally { if (active) previewing.value = false; }
 }
-const ready = computed(() => step.value === "review" && preview.value != null && preview.value.licenses.every(item =>
+const ready = computed(() => draft.value.reason.trim().length > 0 && step.value === "review" && preview.value != null && preview.value.licenses.every(item =>
   !item.shortening || draft.value.selections.find(row => row.license.id === item.id)?.confirmShortening));
 function confirmShortening(id: number, value: boolean) {
   const row = draft.value.selections.find(item => item.license.id === id);
@@ -104,7 +106,7 @@ function confirmShortening(id: number, value: boolean) {
 async function approve() {
   const reviewed = preview.value;
   if (!reviewed || !ready.value || saving.value) return;
-  const result = await save(() => approvePayment(props.detail.payment.id, props.detail.version, actions.value, reviewed), "El pago quedó aprobado.");
+  const result = await save(() => approvePayment(props.detail.payment.id, props.detail.version, actions.value, reviewed, draft.value.reason.trim()), "El pago quedó aprobado.");
   if (result) { reset(); emit("approved"); }
   else { preview.value = null; step.value = "adjust"; }
 }
@@ -122,6 +124,9 @@ async function close() {
       <Message v-if="loadError" severity="error" role="alert">{{ loadError }} <Button type="button" label="Reintentar" text size="small" @click="load" /></Message>
       <Skeleton v-if="loading" height="12rem" />
       <template v-else-if="loaded">
+        <FormField id="approvalReason" label="Comentario público del auditor" required v-slot="field"><Textarea id="approvalReason" v-model="draft.reason" rows="3" maxlength="1000" required :disabled="saving" :aria-describedby="field.describedby" fluid /></FormField>
+        <Message severity="info" :closable="false">La decisión queda registrada con tu usuario y comentario, visible para el cliente. No revierte acciones anteriores sobre licencias.</Message>
+        <PaymentSyncWarning :synchronized-at="detail.payment.angryboxSynchronizedAt" />
         <p class="font-medium" role="status">{{ summary }}</p>
         <template v-if="step === 'adjust'">
           <section class="rounded-border border border-surface p-4" aria-label="Actualización general">

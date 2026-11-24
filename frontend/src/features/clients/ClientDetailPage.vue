@@ -36,7 +36,7 @@ onMounted(async () => {
         icon="pi pi-pencil"
     /></PageHeader>
     <Message v-if="client.portalUserMissing" severity="warn" :closable="false" class="mb-5">
-      Este cliente no tiene un usuario vinculado y no puede ingresar al portal. Vinculá una cuenta habilitada desde Usuarios.
+      Este cliente no tiene una cuenta de referencia para ingresar por DNI/CUIT. Vinculá una cuenta habilitada desde Usuarios.
     </Message>
     <div class="grid gap-6 lg:grid-cols-3">
       <Card class="lg:col-span-2"
@@ -70,9 +70,23 @@ onMounted(async () => {
               </dd>
             </div>
             <div>
-              <dt class="text-sm text-muted-color">Usuario vinculado</dt>
-              <dd class="mt-2">{{ client.username }}</dd>
+              <dt class="text-sm text-muted-color">Usuarios vinculados</dt>
+              <dd class="mt-2">
+                <RouterLink :to="{ path: '/users', query: { clientId: client.id } }" class="text-primary hover:underline">
+                  {{ client.userCount }} {{ client.userCount === 1 ? 'cuenta' : 'cuentas' }} · Ver usuarios
+                </RouterLink>
+                <p class="mt-2 text-sm text-muted-color">Referencia del acceso por DNI/CUIT: {{ client.username }}</p>
+              </dd>
             </div>
+<div v-if="client.street"><dt class="text-sm text-muted-color">Calle</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.street }}</dd></div>
+<div v-if="client.streetNumber"><dt class="text-sm text-muted-color">Número</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.streetNumber }}</dd></div>
+<div v-if="client.addressComplement"><dt class="text-sm text-muted-color">Interior / Piso / Departamento / Oficina</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.addressComplement }}</dd></div>
+<div v-if="client.neighborhood"><dt class="text-sm text-muted-color">Barrio / Sector</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.neighborhood }}</dd></div>
+<div v-if="client.city"><dt class="text-sm text-muted-color">Ciudad / Localidad</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.city }}</dd></div>
+<div v-if="client.countryName"><dt class="text-sm text-muted-color">País</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.countryName }}</dd></div>
+<div v-if="client.provinceName"><dt class="text-sm text-muted-color">Provincia</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.provinceName }}</dd></div>
+<div v-if="client.postalCode"><dt class="text-sm text-muted-color">Código postal</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.postalCode }}</dd></div>
+<div v-if="client.observations"><dt class="text-sm text-muted-color">Observaciones</dt><dd class="mt-2 whitespace-pre-wrap break-words">{{ client.observations }}</dd></div>
           </dl></template
         ></Card
       >
@@ -106,6 +120,12 @@ onMounted(async () => {
               label="Ver usuarios vinculados"
               icon="pi pi-users"
               text
+            /><Button
+              as="router-link"
+              :to="{ path: '/users/new', query: { clientId: client.id } }"
+              label="Nuevo usuario"
+              icon="pi pi-user-plus"
+              outlined
             /></div></template
       ></Card>
       <Card class="lg:col-span-3">

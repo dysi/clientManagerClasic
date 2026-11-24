@@ -10,7 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
-@RestControllerAdvice(assignableTypes = { WebSessionController.class, WebClientController.class, WebAdminController.class, WebParameterController.class, WebPortalController.class, WebReceiptController.class, WebPaymentReviewController.class, WebLicenseQueryController.class, LicenseV2Controller.class })
+@RestControllerAdvice(assignableTypes = { WebSessionController.class, WebClientController.class, WebAdminController.class, WebParameterController.class, WebPortalController.class, WebReceiptController.class, WebPaymentReviewController.class, WebLicenseQueryController.class, LicenseV2Controller.class, PortalTicketController.class })
 public class WebErrorHandler {
     @ExceptionHandler({MethodArgumentNotValidException.class, org.springframework.validation.BindException.class})
     public ResponseEntity<?> validation(org.springframework.validation.BindException error) {

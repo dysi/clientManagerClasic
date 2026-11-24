@@ -58,6 +58,13 @@ class WebFrontendTests {
         long second = newClient(browser, "Segundo");
         long license = write(browser, "POST", "/web/api/licenses", licenseInput(first, 111L), 201).get("id").asLong();
         write(browser, "POST", "/web/api/licenses", licenseInput(second, 222L), 201);
+        mvc.perform(get("/web/api/clients").session(browser.session).param("keyword", "Primero"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].licenseCounts.total").value(1))
+                .andExpect(jsonPath("$.content[0].licenseCounts.active").value(1))
+                .andExpect(jsonPath("$.content[0].licenseCounts.expired").value(0))
+                .andExpect(jsonPath("$.content[0].licenseCounts.blocked").value(0))
+                .andExpect(jsonPath("$.content[0].licenseCounts.unknown").value(0));
         for (String resource : List.of("clients", "licenses", "payments", "users")) {
             mvc.perform(get("/web/api/" + resource).session(browser.session))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(50));
@@ -85,11 +92,20 @@ class WebFrontendTests {
             JsonNode result = write(browser, "PUT", "/web/api/licenses/" + id, input, 200);
             assertEquals(days[index], result.get("daysUntilLock").asInt());
             assertEquals(states[index], result.get("status").asText());
+            mvc.perform(get("/web/api/clients/" + input.get("clientId")).session(browser.session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.licenseCounts.total").value(1))
+                    .andExpect(jsonPath("$.licenseCounts.active").value(days[index] > 0 ? 1 : 0))
+                    .andExpect(jsonPath("$.licenseCounts.expired").value(days[index] <= 0 ? 1 : 0));
         }
         assertEquals("BLOCKED", write(browser, "PUT", "/web/api/licenses/" + id + "/lock",
                 java.util.Map.of("locked", true), 200).get("status").asText());
         input.put("lockDate", java.time.LocalDate.now().minusDays(1).toString());
         assertEquals("BLOCKED", write(browser, "PUT", "/web/api/licenses/" + id, input, 200).get("status").asText());
+        mvc.perform(get("/web/api/clients/" + input.get("clientId")).session(browser.session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.licenseCounts.blocked").value(1))
+                .andExpect(jsonPath("$.licenseCounts.expired").value(0));
     }
 
     @Test void licensesValidateOwnershipUniquenessAndExplicitIdempotentLock() throws Exception {
@@ -112,6 +128,41 @@ class WebFrontendTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
         input.put("clientId", client); input.put("companyName", "Actualizada");
         assertEquals("2099-12-31", write(browser, "PUT", "/web/api/licenses/" + id, input, 200).get("lockDate").asText());
+        String batchPath = "/web/api/licenses/batch";
+        write(browser, "PUT", batchPath, java.util.Map.of("ids", List.of(id, id), "action", "BLOCK"), 400);
+        write(browser, "PUT", batchPath, java.util.Map.of("ids", List.of(id), "action", "LOCK_DATE"), 400);
+        write(browser, "PUT", batchPath, java.util.Map.of("ids", List.of(id, 999999L), "action", "BLOCK"), 404);
+        mvc.perform(get("/web/api/licenses/" + id).session(browser.session))
+                .andExpect(jsonPath("$.locked").value(false));
+        write(browser, "PUT", "/web/api/licenses/" + id + "/lock", java.util.Map.of("locked", true), 200);
+        String date = java.time.LocalDate.now().toString();
+        JsonNode changed = write(browser, "PUT", batchPath,
+                java.util.Map.of("ids", List.of(second, id), "action", "LOCK_DATE", "lockDate", date), 200);
+        assertEquals(2, changed.size());
+        for (JsonNode license : changed) {
+            assertEquals(date, license.get("lockDate").asText());
+            assertEquals(license.get("id").asLong() == id, license.get("locked").asBoolean());
+        }
+        for (int retry = 0; retry < 2; retry++) {
+            JsonNode blocked = write(browser, "PUT", batchPath,
+                    java.util.Map.of("ids", List.of(id, second), "action", "BLOCK"), 200);
+            for (JsonNode license : blocked) {
+                assertTrue(license.get("locked").asBoolean());
+                assertEquals(date, license.get("lockDate").asText());
+            }
+        }
+        for (int retry = 0; retry < 2; retry++) {
+            JsonNode unblocked = write(browser, "PUT", batchPath,
+                    java.util.Map.of("ids", List.of(id, second), "action", "UNBLOCK"), 200);
+            for (JsonNode license : unblocked) {
+                assertFalse(license.get("locked").asBoolean());
+                assertEquals(date, license.get("lockDate").asText());
+                assertEquals("EXPIRED", license.get("status").asText());
+            }
+        }
+        mvc.perform(put(batchPath).session(browser.session).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("ids", List.of(id), "action", "BLOCK"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test void obsoletePaymentWritesAreClosedAndUnknownIdsRemainNotFound() throws Exception {
@@ -132,15 +183,35 @@ class WebFrontendTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].licenseId").isEmpty())
                 .andExpect(jsonPath("$.content[0].amount").value(100.25))
+                .andExpect(jsonPath("$.content[0].bankAccountId").value(payment.getBankAccount().getId()))
+                .andExpect(jsonPath("$.content[0].destinationBank").value(payment.getDestinationBank()))
+                .andExpect(jsonPath("$.content[0].decidedBy").isEmpty())
                 .andExpect(jsonPath("$.content[0].discount").doesNotExist())
                 .andExpect(jsonPath("$.content[0].paymentRealDate").doesNotExist())
                 .andExpect(jsonPath("$.content[0].bankAccount").doesNotExist())
                 .andExpect(jsonPath("$.content[0].submittedBy").doesNotExist());
         mvc.perform(get("/web/api/payments").session(browser.session).param("status", "APROBADO"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/web/api/payments").session(browser.session).param("bankAccountId", "999999"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/web/api/payments/counts").session(browser.session)
+                .param("bankAccountId", String.valueOf(payment.getBankAccount().getId())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.pending").value(1));
+        mvc.perform(get("/web/api/options/payment-bank-accounts").session(browser.session)
+                .param("keyword", payment.getDestinationBank()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(payment.getBankAccount().getId()));
         write(browser, "PUT", "/web/api/payments/" + payment.getId(), java.util.Map.of(), 409);
         write(browser, "PUT", "/web/api/payments/" + payment.getId() + "/status", java.util.Map.of("removed", true), 409);
         assertEquals(PaymentStatus.PENDIENTE, payments.findById(payment.getId()).orElseThrow().getStatus());
+        payment.decide(PaymentStatus.APROBADO);
+        PaymentStatusHistory decision = new PaymentStatusHistory(); decision.setPayment(payment);
+        decision.setPreviousStatus(PaymentStatus.PENDIENTE); decision.setNewStatus(PaymentStatus.APROBADO);
+        decision.setOccurredAt(java.time.LocalDateTime.of(2026, 11, 21, 12, 0));
+        decision.setResponsibleUser(actor); decision.setOrigin(OperationOrigin.ACCESO_AUTENTICADO);
+        em.persist(decision); em.flush();
+        mvc.perform(get("/web/api/payments").session(browser.session).param("status", "APROBADO"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].decidedBy").value(actor.getUsername()));
+
     }
 
     @Test void userProfilePreservesPasswordAndMaintainsBothSidesOfClientLink() throws Exception {
@@ -158,10 +229,26 @@ class WebFrontendTests {
         write(browser, "PUT", "/web/api/users/" + id, input, 200);
         assertEquals(hash, users.findById(id).orElseThrow().getPassword());
         input.put("username", "another-user"); input.put("password", "NewPassword123!");
-        write(browser, "POST", "/web/api/users", input, 409);
+        JsonNode second = write(browser, "POST", "/web/api/users", input, 201);
+        long secondId = second.get("id").asLong();
+        Browser firstLogin = login("new-user", "NewPassword123!");
+        Browser secondLogin = login("another-user", "NewPassword123!");
+        mvc.perform(get("/web/portal/overview").session(firstLogin.session)).andExpect(status().isOk());
+        mvc.perform(get("/web/portal/overview").session(secondLogin.session)).andExpect(status().isOk());
+        write(browser, "PUT", "/web/api/users/" + secondId + "/password",
+                java.util.Map.of("password", "IndependentPassword123!"), 204);
+        assertEquals(hash, users.findById(id).orElseThrow().getPassword());
+        mvc.perform(get("/web/session").session(firstLogin.session)).andExpect(status().isOk());
+        mvc.perform(get("/web/session").session(secondLogin.session)).andExpect(status().isUnauthorized());
+        assertEquals(client, users.findById(secondId).orElseThrow().getClient().getId());
+        assertEquals(id, clients.findById(client).orElseThrow().getUser().getId());
+        mvc.perform(get("/web/api/clients/" + client).session(browser.session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.userCount").value(2));
+        mvc.perform(get("/web/api/clients").param("keyword", "another-user").session(browser.session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
         input.put("username", "new-user"); input.remove("password"); input.put("clientId", null);
         write(browser, "PUT", "/web/api/users/" + id, input, 200);
-        assertNull(clients.findById(client).orElseThrow().getUser());
+        assertEquals(secondId, clients.findById(client).orElseThrow().getUser().getId());
         assertNull(users.findById(id).orElseThrow().getClient());
         input.put("username", admin.getUsername()); input.put("enabled", false); input.put("roles", List.of("ROLE_ADMIN"));
         write(browser, "PUT", "/web/api/users/" + admin.getId(), input, 409);
@@ -183,6 +270,10 @@ class WebFrontendTests {
     }
 
     private Browser login() throws Exception {
+        return login("browser-admin", "test-password");
+    }
+
+    private Browser login(String username, String password) throws Exception {
         MvcResult result = mvc.perform(get("/web/session/csrf")).andExpect(status().isOk()).andReturn();
         MockHttpSession session = (MockHttpSession) result.getRequest().getSession();
         String oldId = session.getId();
@@ -190,7 +281,7 @@ class WebFrontendTests {
         mvc.perform(post("/web/session/login").session(session)
                 .header(csrf.get("headerName").asText(), csrf.get("token").asText())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"browser-admin\",\"password\":\"test-password\"}"))
+                .content(json.writeValueAsString(java.util.Map.of("username", username, "password", password))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.token").doesNotExist());
         assertNotEquals(oldId, session.getId(), "Login must rotate the session ID");
         JsonNode rotated = json.readTree(mvc.perform(get("/web/session/csrf").session(session))
@@ -211,7 +302,7 @@ class WebFrontendTests {
     @Test void clientRoundTripPreservesContactAndRejectsPartialEdits() throws Exception {
         account(AuthorityName.ROLE_ADMIN);
         Browser browser = login();
-        String body = "{\"firstname\":\"Ana\",\"lastname\":\"Pérez\",\"email\":\"ana@example.test\",\"phone\":\"123456\",\"cuil\":\"20123456789\"}";
+        String body = "{\"firstname\":\"Ana\",\"lastname\":\"Pérez\",\"email\":\"ana@example.test\",\"phone\":\"123456\",\"cuil\":\"20123456786\"}";
         MvcResult created = mvc.perform(post("/web/api/clients").session(browser.session)
                 .header(browser.header, browser.token).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(header().exists("Location")).andReturn();
@@ -221,7 +312,7 @@ class WebFrontendTests {
                 .header(browser.header, browser.token).contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("Pérez", "Gómez")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.phone").value("123456"))
-                .andExpect(jsonPath("$.email").value("ana@example.test")).andExpect(jsonPath("$.cuil").value("20123456789"));
+                .andExpect(jsonPath("$.email").value("ana@example.test")).andExpect(jsonPath("$.cuil").value("20123456786"));
         mvc.perform(get("/web/api/clients").session(browser.session).param("keyword", "Gómez"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
         mvc.perform(put("/web/api/clients/" + id).session(browser.session)
@@ -239,7 +330,7 @@ class WebFrontendTests {
     @Test void userRoleCannotAdministerAndDisabledAccountLosesSession() throws Exception {
         User user = account(AuthorityName.ROLE_USER);
         Client client = new Client(); client.setFirstname("Portal"); client.setLastname("Prueba");
-        client.setDni("1234567"); client.setCuil("20-01234567-9"); client.setUser(user);
+        client.setDni("1234567"); client.setCuil("20-01234567-5"); client.setUser(user);
         clients.saveAndFlush(client); user.setClient(client); users.saveAndFlush(user);
         Browser browser = login();
         mvc.perform(get("/web/session").session(browser.session)).andExpect(jsonPath("$.access").value("PORTAL"));
@@ -247,14 +338,15 @@ class WebFrontendTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Portal"))
                 .andExpect(jsonPath("$.origin").value("ACCESO_AUTENTICADO"));
         mvc.perform(get("/web/api/clients").session(browser.session)).andExpect(status().isForbidden());
+        write(browser, "PUT", "/web/api/licenses/batch", java.util.Map.of("ids", List.of(1L), "action", "BLOCK"), 403);
         mvc.perform(get("/users/create").session(browser.session)).andExpect(status().isForbidden());
         // Incluso un usuario ADMIN asociado solo recibe la capacidad del portal por documento.
         Authority admin = new Authority(); admin.setName(AuthorityName.ROLE_ADMIN); authorities.saveAndFlush(admin);
         user.setAuthorities(new java.util.ArrayList<>(List.of(admin))); users.saveAndFlush(user);
         mvc.perform(post("/web/session/document").session(browser.session).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"type\":\"DNI\",\"document\":\"1.234.567\"}")).andExpect(status().isForbidden());
+                .content("{\"document\":\"1.234.567\"}")).andExpect(status().isForbidden());
         mvc.perform(post("/web/session/document").session(browser.session).header(browser.header, browser.token)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"CUIT\",\"document\":\"20-01234567-9\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"document\":\"20-01234567-5\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.roles[0]").value("PORTAL_VIEW"))
                 .andExpect(jsonPath("$.origin").value("PORTAL_DOCUMENTO"));
         mvc.perform(get("/web/api/banks").session(browser.session)).andExpect(status().isForbidden());
@@ -269,14 +361,14 @@ class WebFrontendTests {
                 .andReturn().getResponse().getContentAsString());
         mvc.perform(post("/web/session/document").session(browser.session)
                 .header(token.get("headerName").asText(), token.get("token").asText())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"DNI\",\"document\":\"1234567\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"document\":\"01234567\"}"))
                 .andExpect(status().isOk());
         Client ambiguous = new Client(); ambiguous.setDni("01234567"); clients.saveAndFlush(ambiguous);
         token = json.readTree(mvc.perform(get("/web/session/csrf").session(browser.session))
                 .andReturn().getResponse().getContentAsString());
         mvc.perform(post("/web/session/document").session(browser.session)
                 .header(token.get("headerName").asText(), token.get("token").asText())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"DNI\",\"document\":\"1234567\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"document\":\"01234567\"}"))
                 .andExpect(status().isUnauthorized());
         user.setEnabled(false); users.saveAndFlush(user);
         mvc.perform(get("/web/session").session(browser.session)).andExpect(status().isUnauthorized());

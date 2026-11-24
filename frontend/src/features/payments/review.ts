@@ -24,8 +24,8 @@ export function reviewDetail(id: number) { return request<ReviewDetail>(`/web/ap
 export function previewApproval(id: number, version: number, licenses: LicenseAction[]) {
   return request<ApprovalPreview>(`/web/api/payments/${id}/approve-preview`, { method: "POST", body: JSON.stringify({ version, licenses, reviewAllLicenses: true }) });
 }
-export function approvePayment(id: number, version: number, licenses: LicenseAction[], preview: ApprovalPreview) {
-  return request<ReviewDetail>(`/web/api/payments/${id}/approve`, { method: "POST", body: JSON.stringify({ version, licenses, reviewAllLicenses: true, reviewedOn: preview.today, previewToken: preview.token }) });
+export function approvePayment(id: number, version: number, licenses: LicenseAction[], preview: ApprovalPreview, reason: string) {
+  return request<ReviewDetail>(`/web/api/payments/${id}/approve`, { method: "POST", body: JSON.stringify({ version, licenses, reviewAllLicenses: true, reason, reviewedOn: preview.today, previewToken: preview.token }) });
 }
 export function rejectPayment(id: number, version: number, reason: string) {
   return request<ReviewDetail>(`/web/api/payments/${id}/reject`, { method: "POST", body: JSON.stringify({ version, reason }) });

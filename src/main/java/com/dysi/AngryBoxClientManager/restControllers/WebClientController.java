@@ -23,9 +23,20 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class WebClientController {
     private final ClientRepository clients;
     private final WebClientReadService reads;
-    public WebClientController(ClientRepository clients, WebClientReadService reads) {
+    private final com.dysi.AngryBoxClientManager.servicesImpl.ClientDocumentValidation documents;
+    private final com.dysi.AngryBoxClientManager.servicesImpl.ClientAddressService addresses;
+    public WebClientController(ClientRepository clients, WebClientReadService reads,
+            com.dysi.AngryBoxClientManager.servicesImpl.ClientAddressService addresses,
+            com.dysi.AngryBoxClientManager.servicesImpl.ClientDocumentValidation documents) {
+        this.documents = documents;
+        this.addresses = addresses;
         this.clients = clients; this.reads = reads;
     }
+
+    @GetMapping("/countries")
+    public java.util.List<com.dysi.AngryBoxClientManager.servicesImpl.ClientAddressService.Place> countries() { return addresses.countries(); }
+    @GetMapping("/provinces")
+    public java.util.List<com.dysi.AngryBoxClientManager.servicesImpl.ClientAddressService.Place> provinces() { return addresses.provinces(); }
 
     @GetMapping
     public Page<WebClientView> list(@RequestParam(defaultValue = "") String keyword,
@@ -74,6 +85,8 @@ public class WebClientController {
         return clients.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el cliente."));
     }
     private void fill(Client client, ClientInput input) {
+        documents.validate(input.cuil, input.dni == null ? client.getDni() : input.dni);
+        addresses.fill(client, input);
         client.setFirstname(input.firstname.trim()); client.setLastname(input.lastname.trim());
         client.setEmail(input.email.trim()); client.setPhone(input.phone.trim()); client.setCuil(input.cuil.trim());
         if (input.dni != null) client.setDni(input.dni.isEmpty() ? null : input.dni);

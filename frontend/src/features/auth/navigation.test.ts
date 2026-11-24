@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Estas pruebas verifican el router real sin cargar las dependencias visuales de las páginas.
+vi.mock("./LoginPage.vue", () => ({ default: { template: "<div />" } }));
+vi.mock("../licenses/LicensesPage.vue", () => ({ default: { template: "<div />" } }));
+vi.mock("../payments/PaymentsPage.vue", () => ({ default: { template: "<div />" } }));
+
 import { router } from "../../router";
 import { session } from "./session";
 import { returnPath } from "./navigation";

@@ -201,7 +201,7 @@ async function submit() {
             id="clientId"
             label="Cliente vinculado"
             :error="fields.clientId"
-            hint="Opcional. Un cliente puede vincularse con una sola cuenta."
+            hint="Opcional. Un cliente puede tener varias cuentas, cada una con su contraseña y permisos. Podés usar una para AngryBox y otra para el portal."
             v-slot="field"
             ><EntitySelect
               v-model="form.clientId"
@@ -213,6 +213,7 @@ async function submit() {
               :describedby="field.describedby" /><Button
               v-if="form.clientId"
               label="Quitar vinculación"
+              type="button"
               text
               size="small"
               severity="secondary"

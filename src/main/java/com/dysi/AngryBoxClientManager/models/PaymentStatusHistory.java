@@ -7,7 +7,7 @@ import javax.validation.constraints.*;
 
 /** Evento inmutable de creación o decisión del pago; no sustituye la autorización del servicio. */
 @Entity
-@Table(name = "PAYMENT_STATUS_HISTORY", uniqueConstraints = @UniqueConstraint(name = "uk_payment_history_state", columnNames = { "PAYMENT_ID", "NEW_STATUS" }))
+@Table(name = "PAYMENT_STATUS_HISTORY")
 public class PaymentStatusHistory extends AuditableEntity {
     @Id
     @Column(name = "ID")
@@ -56,7 +56,7 @@ public class PaymentStatusHistory extends AuditableEntity {
     @PrePersist
     private void validateTransition() {
         boolean creation = previousStatus == null && newStatus == PaymentStatus.PENDIENTE;
-        boolean decision = previousStatus == PaymentStatus.PENDIENTE
+        boolean decision = previousStatus != null && previousStatus != newStatus
                 && (newStatus == PaymentStatus.APROBADO || newStatus == PaymentStatus.RECHAZADO);
         if (!creation && !decision) throw new IllegalStateException("Transición de pago inválida.");
         if (decision && origin != OperationOrigin.ACCESO_AUTENTICADO)

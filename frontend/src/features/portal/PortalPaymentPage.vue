@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -46,6 +46,7 @@ const loading = ref(true);
 const loadError = ref("");
 const step = ref(1);
 const validation = ref("");
+const errorSummary = ref<HTMLElement | null>(null);
 const copied = ref("");
 const result = ref<PortalPayment | null>(null);
 const submissionKey = ref(Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) => value.toString(16).padStart(2, "0")).join(""));
@@ -99,13 +100,18 @@ function validDetails(): boolean {
   else return true;
   return false;
 }
+async function showError() {
+  await nextTick();
+  errorSummary.value?.focus({ preventScroll: true });
+  errorSummary.value?.scrollIntoView({ block: "center", behavior: "auto" });
+}
 async function advance() {
   validation.value = "";
   if (step.value === 1) {
-    if (form.value.bankAccountId == null || selected.value == null) { validation.value = "Elegí expresamente una cuenta destinataria."; return; }
+    if (form.value.bankAccountId == null || selected.value == null) { validation.value = "Elegí expresamente una cuenta destinataria."; await showError(); return; }
     step.value = 2; return;
   }
-  if (!validDetails()) return;
+  if (!validDetails()) { await showError(); return; }
   if (step.value === 2) { step.value = 3; return; }
   const accountId = form.value.bankAccountId, amount = form.value.amount;
   const account = selected.value;
@@ -115,6 +121,7 @@ async function advance() {
     withoutReceipt: form.value.withoutReceipt, noReceiptReason: form.value.withoutReceipt ? form.value.noReceiptReason.trim() : null,
     comment: form.value.comment.trim() || null, submissionKey: submissionKey.value, descriptions: receipts.value.map(item => item.description.trim() || null) }, files.value), "El pago quedó presentado y pendiente de revisión.");
   if (payment) { result.value = payment; updateReceipts([]); reset(); }
+  else if (error.value) await showError();
 }
 async function cancel() { if (await discard()) await router.push("/portal"); }
 </script>
@@ -137,7 +144,9 @@ async function cancel() { if (await discard()) await router.push("/portal"); }
       <li v-for="(label, index) in steps" :key="label" :aria-current="step === index + 1 ? 'step' : undefined"
         :class="['rounded-border border p-3 text-sm', step === index + 1 ? 'border-primary bg-highlight font-semibold' : 'border-surface text-muted-color']">{{ index + 1 }}. {{ label }}</li>
     </ol>
-    <Message v-if="error || validation" severity="error" role="alert" class="mb-5">{{ validation || error }}</Message>
+    <div v-if="error || validation" ref="errorSummary" tabindex="-1" class="mb-5">
+      <Message severity="error" role="alert">{{ validation || error }}</Message>
+    </div>
     <div v-if="step === 1" class="flex flex-col gap-4">
       <Message v-if="accountsError" severity="error" role="alert">{{ accountsError }}</Message>
       <Message v-else-if="!loadingAccounts && total === 0" severity="warn" :closable="false">No hay cuentas destinatarias disponibles. Contactá al administrador; por ahora no podés presentar la transferencia.</Message>

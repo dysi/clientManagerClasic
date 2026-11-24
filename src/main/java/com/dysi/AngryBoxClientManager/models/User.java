@@ -60,7 +60,8 @@ public class User extends AuditableEntity {
             inverseJoinColumns = {@JoinColumn(name = "AUTHORITY_ID", referencedColumnName = "ID")})
     private List<Authority> authorities;
 
-    @OneToOne
+    @ManyToOne
+    @JoinColumn(name = "client_id")
     private Client client;
 
     public Long getId() {

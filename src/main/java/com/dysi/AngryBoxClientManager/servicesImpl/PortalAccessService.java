@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Resuelve el cliente en servidor y comprueba ambos lados del vínculo en cada petición. */
+/** Resuelve el cliente desde la cuenta; el acceso por documento conserva su referencia histórica. */
 @Service
 @Transactional(readOnly = true)
 public class PortalAccessService {
@@ -32,10 +32,13 @@ public class PortalAccessService {
     public PortalPrincipal documentLogin(DocumentType type, String value) {
         // Solo se aceptan separadores conocidos; nunca descartar letras silenciosamente.
         if (value == null || !value.matches("[0-9 .-]+")) invalidDocument();
-        String document = value.replaceAll("[ .-]", "");
-        if (type == null || !document.matches(type == DocumentType.DNI ? "[0-9]{1,8}" : "[0-9]{11}")) {
+        String document = ClientDocumentValidation.normalize(value);
+        // La longitud determina el tipo, incluso si un consumidor anterior aún lo envía.
+        type = document.length() == 8 ? DocumentType.DNI : document.length() == 11 ? DocumentType.CUIT : null;
+        if (type == null || !document.matches(type == DocumentType.DNI ? "[0-9]{8}" : "[0-9]{11}")) {
             invalidDocument();
         }
+        if (type == DocumentType.CUIT && !ClientDocumentValidation.validCuit(value)) invalidDocument();
         String dni = type == DocumentType.DNI ? String.format("%8s", document).replace(' ', '0') : "";
         List<Long> matches = clients.findPortalDocumentMatches(type.name(), document, dni, PageRequest.of(0, 2));
         if (matches.size() != 1) throw denied();
@@ -49,7 +52,7 @@ public class PortalAccessService {
         List<Long> matches = clients.findPortalClientsForUser(user.getId(), PageRequest.of(0, 2));
         if (matches.size() != 1) throw denied();
         Client client = clients.findById(matches.get(0)).orElseThrow(this::denied);
-        associatedUser(client);
+        validateAccount(client, user);
         return new PortalPrincipal(client.getId(), user, OperationOrigin.ACCESO_AUTENTICADO);
     }
 
@@ -67,7 +70,10 @@ public class PortalAccessService {
 
     public PortalPrincipal revalidate(PortalPrincipal principal) {
         Client client = clients.findById(principal.getClientId()).orElseThrow(this::denied);
-        User user = associatedUser(client);
+        User user = users.findById(principal.getId()).orElseThrow(this::denied);
+        validateAccount(client, user);
+        if (principal.getOrigin() == OperationOrigin.PORTAL_DOCUMENTO
+                && (client.getUser() == null || !Objects.equals(client.getUser().getId(), user.getId()))) throw denied();
         if (!Objects.equals(user.getId(), principal.getId())
                 || !Objects.equals(user.getLastPasswordResetDate(), principal.getLastPasswordResetDate())) {
             throw denied();
@@ -85,16 +91,20 @@ public class PortalAccessService {
 
     private User associatedUser(Client client) {
         User user = client.getUser();
+        validateAccount(client, user);
+        return user;
+    }
+
+    private void validateAccount(Client client, User user) {
         if (user == null || user.getRemoveDate() != null
                 || !Boolean.TRUE.equals(user.getEnabled()) || user.getClient() == null
                 || !Objects.equals(user.getClient().getId(), client.getId())) throw denied();
         List<Long> matches = clients.findPortalClientsForUser(user.getId(), PageRequest.of(0, 2));
         if (matches.size() != 1 || !Objects.equals(matches.get(0), client.getId())) throw denied();
-        return user;
     }
 
     private void invalidDocument() {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Revisá el tipo y formato del documento.");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingresá un DNI de ocho dígitos o un CUIT válido de once dígitos.");
     }
 
     private ResponseStatusException denied() {

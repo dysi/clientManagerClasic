@@ -113,6 +113,38 @@ public class WebAdminService {
         return licenseView(license);
     }
 
+    /** Aplica el campo elegido a la selección completa o revierte todo ante un error. */
+    @Transactional
+    public List<LicenseView> batchLicenses(LicenseBatchInput input) {
+        if (input.action == LicenseBatchAction.LOCK_DATE && input.lockDate == null)
+            bad("Ingresá la nueva fecha de vencimiento.");
+        if (new HashSet<>(input.ids).size() != input.ids.size()) bad("La selección contiene licencias repetidas.");
+        // Orden estable para que dos selecciones superpuestas tomen los locks en el mismo orden.
+        List<License> selected = input.ids.stream().sorted()
+                .map(id -> licenses.lockById(id).orElseThrow(() -> missing("licencia")))
+                .collect(Collectors.toList());
+        for (License license : selected) {
+            LicenseStatus state = currentState(license);
+            if (state == null && input.action != LicenseBatchAction.LOCK_DATE)
+                conflict("La licencia de " + license.getCompanyName() + " no tiene estado. Completá sus datos antes de cambiar su bloqueo. No se modificó ninguna licencia.");
+            if (state == null) {
+                if (license.getLicenseStatuses() == null) license.setLicenseStatuses(new ArrayList<>());
+                state = new LicenseStatus();
+                state.setLicense(license); state.setForcedLock(false);
+                state.setLimitTransaction(9999999L); state.setObservation("");
+                license.getLicenseStatuses().add(state);
+            } else {
+                entityManager.refresh(state, javax.persistence.LockModeType.PESSIMISTIC_WRITE);
+                if (state.getRemoveDate() != null) conflict("El estado de una licencia cambió. Volvé a buscar y revisá la selección.");
+            }
+            if (input.action == LicenseBatchAction.LOCK_DATE) state.setLockDate(calendar(input.lockDate));
+            else state.setForcedLock(input.action == LicenseBatchAction.BLOCK);
+        }
+        licenses.saveAll(selected);
+        licenses.flush();
+        return selected.stream().map(WebAdminService::licenseView).collect(Collectors.toList());
+    }
+
     @Transactional
     public LicenseView visibility(long id, boolean hidden) {
         License license = licenses.lockById(id).orElseThrow(() -> missing("licencia"));
@@ -129,9 +161,14 @@ public class WebAdminService {
 
     public Page<PaymentView> payments(String keyword, Long licenseId, String status, Long clientId,
             LocalDate from, LocalDate to, int page, int size) {
+        return payments(keyword, licenseId, status, clientId, null, from, to, page, size);
+    }
+
+    public Page<PaymentView> payments(String keyword, Long licenseId, String status, Long clientId,
+            Long bankAccountId, LocalDate from, LocalDate to, int page, int size) {
         page(page, size, keyword, "issuedAt", "id");
         Set<PaymentStatus> selected = paymentStatuses(status);
-        Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, from, to);
+        Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, bankAccountId, from, to);
         if (!selected.isEmpty()) specification = specification.and((root, query, cb) -> root.get("status").in(selected));
         Page<PaymentView> result = payments.findAll(specification,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "issuedAt", "id"))).map(WebAdminService::paymentView);
@@ -144,14 +181,27 @@ public class WebAdminService {
                     .setParameter("ids", ids).getResultList().forEach(delivery -> synchronizedAt.put(
                             delivery.getPaymentId(), LocalDateTime.ofInstant(delivery.getDeliveredAt(), ZoneId.of(reviewTimeZone))));
             result.forEach(view -> view.angryboxSynchronizedAt = synchronizedAt.get(view.id));
+            // La última decisión contempla rectificaciones, sin consultas por cada fila.
+            Map<Long, String> decisionUsers = new HashMap<>();
+            entityManager.createQuery("select h from PaymentStatusHistory h join fetch h.responsibleUser "
+                    + "where h.payment.id in :ids and h.newStatus = h.payment.status "
+                    + "and h.newStatus <> :pending and h.id = (select max(t.id) from PaymentStatusHistory t "
+                    + "where t.payment = h.payment and t.newStatus <> :pending)", PaymentStatusHistory.class)
+                    .setParameter("ids", ids).setParameter("pending", PaymentStatus.PENDIENTE)
+                    .getResultList().forEach(event -> decisionUsers.put(event.getPayment().getId(), event.getResponsibleUser().getUsername()));
+            result.forEach(view -> view.decidedBy = decisionUsers.get(view.id));
         }
         return result;
     }
 
     /** Los contadores conservan los filtros de contexto, sin restringirse a los estados seleccionados. */
     public PaymentCounts paymentCounts(String keyword, Long licenseId, Long clientId, LocalDate from, LocalDate to) {
+        return paymentCounts(keyword, licenseId, clientId, null, from, to);
+    }
+
+    public PaymentCounts paymentCounts(String keyword, Long licenseId, Long clientId, Long bankAccountId, LocalDate from, LocalDate to) {
         page(0, 50, keyword, "id");
-        Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, from, to);
+        Specification<Payment> specification = paymentFilters(keyword, licenseId, clientId, bankAccountId, from, to);
         PaymentCounts counts = new PaymentCounts();
         counts.pending = countPayments(specification, PaymentStatus.PENDIENTE);
         counts.approved = countPayments(specification, PaymentStatus.APROBADO);
@@ -174,7 +224,7 @@ public class WebAdminService {
         return selected;
     }
 
-    private Specification<Payment> paymentFilters(String keyword, Long licenseId, Long clientId, LocalDate from, LocalDate to) {
+    private Specification<Payment> paymentFilters(String keyword, Long licenseId, Long clientId, Long bankAccountId, LocalDate from, LocalDate to) {
         if (from != null && to != null && from.isAfter(to)) bad("La fecha desde no puede ser posterior a hasta.");
         if ((from != null && (from.getYear() < 1000 || from.getYear() > 9999))
                 || (to != null && (to.getYear() < 1000 || to.getYear() > 9998))) bad("Rango de fechas inválido.");
@@ -187,11 +237,25 @@ public class WebAdminService {
                     like(cb, client.get("legalName"), keyword), like(cb, client.get("tradeName"), keyword)));
             filters.add(cb.isNull(root.get("removeDate")));
             if (clientId != null) filters.add(cb.equal(client.get("id"), clientId));
+            if (bankAccountId != null) filters.add(cb.equal(root.get("bankAccount").get("id"), bankAccountId));
             if (from != null) filters.add(cb.greaterThanOrEqualTo(root.get("issuedAt"), from.atStartOfDay()));
             if (to != null) filters.add(cb.lessThan(root.get("issuedAt"), to.plusDays(1).atStartOfDay()));
             if (licenseId != null) filters.add(cb.equal(license.get("id"), licenseId));
             return cb.and(filters.toArray(new Predicate[0]));
         };
+    }
+
+    /** Incluye cuentas inactivas o anuladas para consultar pagos históricos. */
+    public List<Option> paymentBankAccountOptions(String keyword) {
+        page(0, 25, keyword, "id");
+        return entityManager.createQuery("select a from BankAccount a join fetch a.bank b "
+                + "where lower(b.name) like :keyword escape '!' or lower(a.holder) like :keyword escape '!' "
+                + "or a.cbu like :keyword escape '!' or lower(a.alias) like :keyword escape '!' "
+                + "order by b.name, a.id", BankAccount.class)
+                .setParameter("keyword", pattern(keyword)).setMaxResults(25).getResultList().stream()
+                .map(account -> new Option(account.getId(), account.getBank().getName() + " · " + account.getHolder()
+                        + " · " + (account.getAlias() == null ? account.getCbu() : account.getAlias())))
+                .collect(Collectors.toList());
     }
 
     public PaymentView payment(long id) { return paymentView(findPayment(id)); }
@@ -272,17 +336,23 @@ public class WebAdminService {
             roles.add(authority);
         }
         Client previous = user.getClient();
-        Client next = input.clientId == null ? null : findClient(input.clientId);
-        if (next != null && ((next.getUser() != null && !Objects.equals(next.getUser().getId(), user.getId()))
-                || users.findByClient(next).stream().anyMatch(other -> !Objects.equals(other.getId(), user.getId()))))
-            conflict("El cliente ya tiene un usuario vinculado.");
+        Client next = input.clientId == null ? null : clients.lockPortalClient(input.clientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el cliente."));
         if (previous != null && previous != next && previous.getUser() != null && Objects.equals(previous.getUser().getId(), user.getId())) {
-            previous.setUser(null); clients.save(previous);
+            previous.setUser(users.findByClient(previous).stream()
+                    .filter(other -> !Objects.equals(other.getId(), user.getId()))
+                    .min(java.util.Comparator.comparing(User::getId)).orElse(null));
+            clients.save(previous);
         }
+        if (previous != null && previous != next) previous.getUsers().remove(user);
         user.setFirstname(input.firstname.trim()); user.setLastname(input.lastname.trim()); user.setEmail(input.email.trim());
         user.setEnabled(input.enabled); user.setAuthorities(roles); user.setClient(next);
         users.saveAndFlush(user);
-        if (next != null) { next.setUser(user); clients.saveAndFlush(next); }
+        if (next != null) {
+            if (!next.getUsers().contains(user)) next.getUsers().add(user);
+            if (next.getUser() == null) next.setUser(user);
+            clients.saveAndFlush(next);
+        }
     }
 
     @Transactional
@@ -329,6 +399,9 @@ public class WebAdminService {
         view.licenseId = payment.getLicense() == null ? null : payment.getLicense().getId();
         view.companyName = payment.getLicense() == null ? null : payment.getLicense().getCompanyName();
         view.amount = payment.getAmount(); view.currency = payment.getCurrency().name();
+        view.bankAccountId = payment.getBankAccount().getId();
+        view.destinationBank = payment.getDestinationBank(); view.destinationHolder = payment.getDestinationHolder();
+        view.destinationCbu = payment.getDestinationCbu(); view.destinationAlias = payment.getDestinationAlias();
         view.issuedAt = payment.getIssuedAt(); view.status = payment.getStatus().name();
         return view;
     }

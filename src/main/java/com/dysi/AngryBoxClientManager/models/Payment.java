@@ -118,9 +118,9 @@ public class Payment extends AuditableEntity {
     public void setDestinationCbu(String destinationCbu) { this.destinationCbu = destinationCbu; }
     public String getDestinationAlias() { return destinationAlias; }
     public void setDestinationAlias(String destinationAlias) { this.destinationAlias = destinationAlias; }
-    /** Única transición administrativa: una presentación pendiente se resuelve una sola vez. */
+    /** Decisión administrativa que admite rectificaciones sin reabrir a pendiente. */
     public void decide(PaymentStatus next) {
-        if (status != PaymentStatus.PENDIENTE || (next != PaymentStatus.APROBADO && next != PaymentStatus.RECHAZADO))
+        if (status == next || (next != PaymentStatus.APROBADO && next != PaymentStatus.RECHAZADO))
             throw new IllegalStateException("La transición del pago no está permitida.");
         status = next;
     }

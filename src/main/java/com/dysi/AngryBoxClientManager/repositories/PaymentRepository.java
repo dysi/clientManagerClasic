@@ -13,6 +13,8 @@ import com.dysi.AngryBoxClientManager.models.Payment;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Payment> {
+    long countByClientIdAndStatusAndRemoveDateIsNull(Long clientId,
+            com.dysi.AngryBoxClientManager.models.PaymentStatus status);
 
     @Query(value = "select p from Payment p join fetch p.client where p.status = :status and p.removeDate is null order by p.creationDate, p.id",
             countQuery = "select count(p) from Payment p where p.status = :status and p.removeDate is null")

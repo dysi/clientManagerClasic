@@ -14,6 +14,14 @@ public final class PortalViews {
         public ClientIdentity client;
         public Balance balance;
         public LicenseTotals licenses;
+        public Extension extension;
+    }
+    public static class Extension {
+        public boolean active, eligible, expiredLicenses;
+        public String reason, message, origin;
+        public java.math.BigDecimal durationDays;
+        public java.time.Instant expiresAt;
+        public LocalDate expiresOn;
     }
     public static class ClientIdentity {
         public String firstname, lastname, email, phone, dni, cuil;

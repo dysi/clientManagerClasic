@@ -10,7 +10,7 @@ export interface Option {
 const props = defineProps<{
   modelValue: number | null;
   label?: string;
-  kind: "clients" | "licenses" | "banks" | "portal-licenses";
+  kind: "clients" | "licenses" | "banks" | "portal-licenses" | "payment-bank-accounts";
   inputId: string;
   disabled?: boolean;
   invalid?: boolean;
@@ -72,7 +72,7 @@ function update(value: Option | string | null) {
     :pt="{
       dropdown: {
         'aria-label':
-          { clients: 'Mostrar clientes', licenses: 'Mostrar licencias', banks: 'Mostrar bancos', 'portal-licenses': 'Mostrar mis licencias' }[kind],
+          { clients: 'Mostrar clientes', licenses: 'Mostrar licencias', banks: 'Mostrar bancos', 'payment-bank-accounts': 'Mostrar cuentas bancarias', 'portal-licenses': 'Mostrar mis licencias' }[kind],
       },
     }"
     force-selection

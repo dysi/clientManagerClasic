@@ -21,16 +21,17 @@ function routeClientId(): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 const clientId = ref<number | null>(routeClientId());
-const enabled = ref<string | null>(null);
+const enabled = ref("ALL");
 const authority = ref<string | null>(null);
 const states = [
+  { label: "Todos", value: "ALL" },
   { label: "Habilitado", value: "true" },
-  { label: "Deshabilitado", value: "false" },
+  { label: "Inhabilitado", value: "false" },
 ];
 const { rows, keyword, page, size, total, loading, error, search, paginate } =
   usePagedList<User>("/web/api/users", () => ({
     clientId: clientId.value,
-    enabled: enabled.value,
+    enabled: enabled.value === "ALL" ? null : enabled.value,
     authority: authority.value,
   }));
 watch(() => route.query.clientId, () => {
@@ -72,11 +73,10 @@ function roles(values: string[]) {
           <Select
             v-model="enabled"
             input-id="users-enabled"
+            aria-label="Estado"
             :options="states"
             option-label="label"
             option-value="value"
-            placeholder="Todos los estados"
-            show-clear
             fluid
           />
         </FormField>
@@ -97,6 +97,7 @@ function roles(values: string[]) {
           />
         </FormField>
       </div>
+      <div class="min-w-0 overflow-x-auto">
       <DataTable
         :value="rows"
         :loading="loading"
@@ -119,8 +120,8 @@ function roles(values: string[]) {
         <Column header="Acceso"
           ><template #body="{ data }"
             ><Tag
-              :value="data.enabled ? 'Habilitado' : 'Deshabilitado'"
-              :severity="data.enabled ? 'success' : 'secondary'"
+              :value="data.enabled ? 'Habilitado' : 'Inhabilitado'"
+              :severity="data.enabled ? 'success' : 'danger'"
             />
             <p class="mt-2 text-sm text-muted-color">
               {{ roles(data.roles) }}
@@ -158,7 +159,7 @@ function roles(values: string[]) {
                 size="small"
               /></div></template
         ></Column> </DataTable
-      ><ListPaginator
+      ></div><ListPaginator
         :page="page"
         :size="size"
         :total="total"

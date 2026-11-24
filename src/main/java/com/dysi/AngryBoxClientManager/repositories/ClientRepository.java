@@ -28,14 +28,15 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + ", '0', ''), '1', ''), '2', ''), '3', ''), '4', ''),"
             + " '5', ''), '6', ''), '7', ''), '8', ''), '9', '')";
 
-    @Query(value = "select c from Client c left join fetch c.user u left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
+    @Query(value = "select c from Client c left join fetch c.user u left join fetch c.country left join fetch c.province left join ClientAccountBalance b on b.client = c and b.removeDate is null where ("
             + "lower(concat(c.firstname, ' ', c.lastname)) like :keyword escape '!' "
             + "or lower(concat(c.lastname, ' ', c.firstname)) like :keyword escape '!' "
             + "or lower(coalesce(c.email, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.legalName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
-            + "or lower(coalesce(u.username, '')) like :keyword escape '!')"
+            + "or lower(coalesce(c.dni, '')) like :keyword escape '!' "
+            + "or exists (select account.id from User account where account.client = c and lower(account.username) like :keyword escape '!'))"
             + " and (:balanceState = 'ALL' or (:balanceState = 'UNKNOWN' and b.id is null)"
             + " or (:balanceState = 'DEBT' and b.amount > 0)"
             + " or (:balanceState = 'CREDIT' and b.amount < 0)"
@@ -50,7 +51,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + "or lower(coalesce(c.legalName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.tradeName, '')) like :keyword escape '!' "
             + "or lower(coalesce(c.cuil, '')) like :keyword escape '!' "
-            + "or lower(coalesce(u.username, '')) like :keyword escape '!')"
+            + "or lower(coalesce(c.dni, '')) like :keyword escape '!' "
+            + "or exists (select account.id from User account where account.client = c and lower(account.username) like :keyword escape '!'))"
             + " and (:balanceState = 'ALL' or (:balanceState = 'UNKNOWN' and b.id is null)"
             + " or (:balanceState = 'DEBT' and b.amount > 0)"
             + " or (:balanceState = 'CREDIT' and b.amount < 0)"
@@ -69,7 +71,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
         return searchForWeb(keyword, "ALL", "ALL", null, pageable);
     }
 
-    public Client findClientByUser(User user);
+    @Query("select u.client from User u where u = :user")
+    public Client findClientByUser(@Param("user") User user);
 
     // Serializa presentaciones de un cliente para resolver reenvíos sin duplicar evidencia.
     @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
@@ -80,12 +83,12 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     @Query("select c.id from Client c where "
             + "((:type = 'CUIT' and " + NORMALIZED_CUIT + " = :document) "
             + "or (:type = 'DNI' and ((length(c.dni) > 0 and function('lpad', c.dni, 8, '0') = :dni) "
-            + "or (length(" + NORMALIZED_CUIT + ") = 11 and length(" + CUIT_WITHOUT_DIGITS + ") = 0 "
+            + "or ((c.dni is null or length(trim(c.dni)) = 0) and length(" + NORMALIZED_CUIT + ") = 11 and length(" + CUIT_WITHOUT_DIGITS + ") = 0 "
             + "and substring(" + NORMALIZED_CUIT + ", 3, 8) = :dni))))")
     List<Long> findPortalDocumentMatches(@Param("type") String type, @Param("document") String document,
             @Param("dni") String dni, org.springframework.data.domain.Pageable pageable);
 
-    @Query("select c.id from Client c where c.user.id = :userId")
+    @Query("select u.client.id from User u where u.id = :userId and u.client is not null")
     List<Long> findPortalClientsForUser(@Param("userId") Long userId,
             org.springframework.data.domain.Pageable pageable);
 

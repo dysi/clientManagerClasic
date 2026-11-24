@@ -32,11 +32,11 @@ export async function signIn(username: string, password: string, turnstileToken:
   await refreshCsrf();
 }
 
-export async function signInDocument(type: "DNI" | "CUIT", document: string, turnstileToken: string) {
+export async function signInDocument(document: string, turnstileToken: string) {
   await refreshCsrf();
   session.user = await request<SessionUser>("/web/session/document", {
     method: "POST",
-    body: JSON.stringify({ type, document, turnstileToken }),
+    body: JSON.stringify({ document, turnstileToken }),
   });
   await refreshCsrf();
 }
@@ -44,5 +44,14 @@ export async function signInDocument(type: "DNI" | "CUIT", document: string, tur
 export async function signOut() {
   await request("/web/session/logout", { method: "POST" });
   session.user = null;
+  await refreshCsrf();
+}
+
+export async function signInFromAngrybox(ticket: string) {
+  await refreshCsrf();
+  session.user = await request<SessionUser>("/web/session/portal-access", {
+    method: "POST",
+    body: JSON.stringify({ ticket }),
+  });
   await refreshCsrf();
 }

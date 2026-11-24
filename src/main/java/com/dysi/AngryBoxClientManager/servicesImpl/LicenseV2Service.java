@@ -14,8 +14,12 @@ public class LicenseV2Service {
     private final UserRepository users;
     private final LicenseRepository licenses;
     private final LicenseExtensionService extensions;
-    public LicenseV2Service(UserRepository users, LicenseRepository licenses, LicenseExtensionService extensions) {
+    private final LicenseAccountService accounts;
+
+    public LicenseV2Service(UserRepository users, LicenseRepository licenses, LicenseExtensionService extensions,
+            LicenseAccountService accounts) {
         this.users = users; this.licenses = licenses; this.extensions = extensions;
+        this.accounts = accounts;
     }
     public ObjectNode license(String username, Long companyId, String actor) {
         // v2 no hereda la selección arbitraria de usuario de la API histórica.
@@ -30,6 +34,8 @@ public class LicenseV2Service {
         License license = licenses.findLicensesByClient(client).stream()
                 .filter(value -> companyId.equals(value.getCompanyId())).findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró la licencia para esta cuenta."));
-        return extensions.licenseResponse(client, license);
+        ObjectNode response = extensions.licenseResponse(client, license);
+        accounts.append(response, client.getId());
+        return response;
     }
 }
