@@ -26,6 +26,9 @@ public class BankAccount extends AuditableEntity {
     @Column(name = "ALIAS", length = 100, nullable = true) @Size(max = 100)
     private String alias;
 
+    @Column(name = "EXTERNAL_CODE", length = 100) @Size(max = 100)
+    private String externalCode;
+
     @Column(name = "ACTIVE", nullable = false)
     private boolean active = true;
 
@@ -38,11 +41,14 @@ public class BankAccount extends AuditableEntity {
     public void setCbu(String cbu) { this.cbu = cbu == null ? null : cbu.replaceAll("[\\s-]", ""); }
     public String getAlias() { return alias; }
     public void setAlias(String alias) { this.alias = alias == null || alias.trim().isEmpty() ? null : alias.trim().toLowerCase(java.util.Locale.ROOT); }
+    public String getExternalCode() { return externalCode; }
+    public void setExternalCode(String externalCode) { this.externalCode = externalCode == null || externalCode.trim().isEmpty() ? null : externalCode.trim(); }
     public boolean getActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 
     @PrePersist @PreUpdate
     private void normalize() {
+        setExternalCode(externalCode);
         if (holder != null) holder = holder.trim();
         if (cbu != null) cbu = cbu.replaceAll("[\\s-]", "");
         if (alias != null) { alias = alias.trim().toLowerCase(java.util.Locale.ROOT); if (alias.isEmpty()) alias = null; }

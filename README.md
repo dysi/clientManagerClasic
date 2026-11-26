@@ -256,6 +256,10 @@ Verificación de los datos comerciales: `clean verify` y los recorridos Playwrig
 
 ## Desarrollo del frontend
 
+Las cuentas bancarias en `ui/#/parameters/bank-accounts` admiten un código externo opcional (`externalCode`, hasta 100 caracteres, sin unicidad). Se carga y edita en el ABM, se muestra en el listado y se incluye en su búsqueda. Se recortan espacios en los extremos; vacío limpia el código y omitido/NULL conserva el valor al editar. Es un dato administrativo y no modifica la fotografía bancaria de los pagos.
+
+Requiere la migración Liquibase `20261126-01-codigo-externo-cuenta-bancaria.sql`, que agrega `bank_account.external_code` anulable y conserva las cuentas existentes con NULL. Antes del despliegue, respaldar y validar actualización y recuperación sobre una copia MySQL compatible. El rollback elimina la columna y requiere respaldar sus códigos previamente; MySQL confirma DDL implícitamente.
+
 Con el backend iniciado y un Node compatible instalado, desde `frontend`:
 
 ```text

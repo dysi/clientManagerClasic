@@ -9,4 +9,5 @@
     <include file="changes/20261112-01-extension-manual-licencias.sql" relativeToChangelogFile="true"/>
     <include file="changes/20261113-01-multiples-usuarios-cliente.sql" relativeToChangelogFile="true"/>
     <include file="changes/20261120-01-rectificacion-pagos.sql" relativeToChangelogFile="true"/>
+    <include file="changes/20261126-01-codigo-externo-cuenta-bancaria.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

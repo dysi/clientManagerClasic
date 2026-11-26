@@ -16,7 +16,7 @@ import type { BankAccount, BankAccountInput } from "../../services/parameters";
 const route = useRoute();
 const router = useRouter();
 const id = route.params.id ? Number(route.params.id) : undefined;
-const form = ref<BankAccountInput>({ bankId: null, holder: "", cbu: "", alias: "", active: true });
+const form = ref<BankAccountInput>({ bankId: null, holder: "", cbu: "", alias: "", externalCode: "", active: true });
 const bankName = ref("");
 const loading = ref(true);
 const loadError = ref("");
@@ -27,7 +27,7 @@ onMounted(async () => {
       throw new Error("El identificador del registro es inválido.");
     if (id) {
       const value = await detail<BankAccount>("bank-accounts", id);
-      form.value = { bankId: value.bankId, holder: value.holder, cbu: value.cbu, alias: value.alias || "", active: value.active };
+      form.value = { bankId: value.bankId, holder: value.holder, cbu: value.cbu, alias: value.alias || "", externalCode: value.externalCode ?? "", active: value.active };
       bankName.value = value.bankName;
     }
     reset();
@@ -69,6 +69,10 @@ async function cancel() {
             <InputText id="alias" v-model="form.alias"  maxlength="100"
               :disabled="saving" :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
           </FormField>
+        <FormField id="externalCode" label="Código externo" :error="fields.externalCode" v-slot="field" hint="Opcional. Hasta 100 caracteres.">
+          <InputText id="externalCode" v-model="form.externalCode" maxlength="100"
+            :disabled="saving" :invalid="field.invalid" :aria-describedby="field.describedby" fluid />
+        </FormField>
         <FormField id="active" label="Activa" :error="fields.active" v-slot="field" hint="Una cuenta activa solo estará disponible si su banco también está activo.">
           <ToggleSwitch v-model="form.active" input-id="active" :disabled="saving" :invalid="field.invalid" :aria-describedby="field.describedby" />
         </FormField>

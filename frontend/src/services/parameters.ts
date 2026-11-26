@@ -11,6 +11,7 @@ export interface BankAccount {
   holder: string;
   cbu: string;
   alias: string | null;
+  externalCode: string | null;
   active: boolean;
   bankActive: boolean;
   available: boolean;
@@ -20,6 +21,7 @@ export interface BankAccountInput {
   holder: string;
   cbu: string;
   alias: string;
+  externalCode: string;
   active: boolean;
 }
 export const parameterStates = [

@@ -17,6 +17,7 @@ public final class ParameterInputs {
         @Pattern(regexp = "(?:[\\s-]*[0-9]){22}[\\s-]*", message = "Ingresá un CBU de 22 dígitos.")
         public String cbu;
         @Size(max = 100) public String alias;
+        @Size(max = 100) public String externalCode;
         @NotNull public Boolean active;
     }
     public static class ActiveInput { @NotNull public Boolean active; }

@@ -90,11 +90,23 @@ class ParameterWebTests {
     @Test void accountsNormalizeCbuAndAliasAndCheckRelationsAndUniqueness() throws Exception {
         Browser browser = login(AuthorityName.ROLE_ADMIN); long bank = bank(browser, "Banco");
         var input = accountInput(bank, "00000000000-00000000000", " ALIAS.Prueba ");
+        input.put("externalCode", " CTA-07 ");
         JsonNode value = write(browser, "POST", "/web/api/bank-accounts", input, 201); long id = value.get("id").asLong();
+        assertEquals("CTA-07", value.get("externalCode").asText());
         assertEquals("0000000000000000000000", value.get("cbu").asText());
         assertEquals("alias.prueba", value.get("alias").asText()); assertEquals("Titular de prueba", value.get("holder").asText());
         assertTrue(value.get("available").asBoolean()); assertFalse(value.has("bank")); assertFalse(value.has("createdBy"));
         assertEquals(browser.actor.getId(), accounts.findById(id).orElseThrow().getCreatedBy().getId());
+        mvc.perform(get("/web/api/bank-accounts").session(browser.session).param("keyword", "CTA-07"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].externalCode").value("CTA-07"));
+        input.remove("externalCode");
+        assertEquals("CTA-07", write(browser, "PUT", "/web/api/bank-accounts/" + id, input, 200).get("externalCode").asText());
+        input.put("externalCode", "x".repeat(101));
+        assertTrue(write(browser, "PUT", "/web/api/bank-accounts/" + id, input, 400).get("fields").has("externalCode"));
+        input.put("externalCode", " ");
+        assertTrue(write(browser, "PUT", "/web/api/bank-accounts/" + id, input, 200).get("externalCode").isNull());
+        input.remove("externalCode");
         write(browser, "POST", "/web/api/bank-accounts", input, 409);
         input.put("cbu", "1111111111111111111111"); write(browser, "POST", "/web/api/bank-accounts", input, 409);
         input.put("alias", ""); long second = write(browser, "POST", "/web/api/bank-accounts", input, 201).get("id").asLong();

@@ -29,12 +29,13 @@ const { acting, change } = useParameterActivation("bank-accounts", error, load);
   <Message v-if="bankId" severity="info" class="mb-4">Cuentas de {{ route.query.bankName || "el banco #" + bankId }}. <RouterLink to="/parameters/bank-accounts" class="underline">Ver todas</RouterLink></Message>
   <Message v-if="error" severity="error" class="mb-4">{{ error }}</Message>
   <Card><template #content>
-    <ListToolbar v-model="keyword" :loading="loading" placeholder="Banco, titular, CBU o alias" @search="search">
+    <ListToolbar v-model="keyword" :loading="loading" placeholder="Banco, titular, CBU, alias o código externo" @search="search">
       <Select v-model="status" :options="parameterStates" option-label="label" option-value="value" aria-label="Estado" @change="search" />
     </ListToolbar>
     <DataTable :value="rows" :loading="loading" data-key="id" row-hover striped-rows scrollable>
       <template #empty>No se encontraron cuentas bancarias con estos filtros.</template>
       <Column field="bankName" header="Banco" />
+      <Column header="Código externo"><template #body="{ data }">{{ data.externalCode || "Sin código" }}</template></Column>
       <Column field="holder" header="Titular" />
       <Column header="CBU y alias"><template #body="{ data }">
         <span class="whitespace-nowrap font-mono">{{ data.cbu }}</span>

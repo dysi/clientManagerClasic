@@ -59,7 +59,7 @@ public class ParameterService {
             filters.add(cb.isNull(root.get("removeDate")));
             filters.add(state(cb, root.get("active"), status));
             filters.add(cb.or(like(cb, root.get("holder"), keyword), like(cb, root.get("cbu"), keyword),
-                    like(cb, root.get("alias"), keyword), like(cb, bank.get("name"), keyword)));
+                    like(cb, root.get("externalCode"), keyword), like(cb, root.get("alias"), keyword), like(cb, bank.get("name"), keyword)));
             if (bankId != null) filters.add(cb.equal(bank.get("id"), bankId));
             return cb.and(filters.toArray(new Predicate[0]));
         }, paging).map(this::view);
@@ -79,6 +79,8 @@ public class ParameterService {
         if (normalized.getAlias() != null) accounts.findByAlias(normalized.getAlias()).ifPresent(other -> {
             if (!Objects.equals(other.getId(), id)) conflict("Ya existe una cuenta con ese alias, incluso si está inactiva.");
         });
+        // Omitido o null conserva el código; una cadena vacía lo limpia.
+        if (input.externalCode != null) account.setExternalCode(input.externalCode);
         account.setBank(bank); account.setHolder(normalized.getHolder());
         account.setCbu(normalized.getCbu()); account.setAlias(normalized.getAlias()); account.setActive(input.active);
         return view(accounts.saveAndFlush(account));
@@ -113,6 +115,7 @@ public class ParameterService {
     private BankAccountView view(BankAccount account) {
         BankAccountView view = new BankAccountView(); view.id = account.getId(); view.bankId = account.getBank().getId();
         view.bankName = account.getBank().getName(); view.holder = account.getHolder();
+        view.externalCode = account.getExternalCode();
         view.cbu = account.getCbu(); view.alias = account.getAlias(); view.active = account.getActive();
         view.bankActive = account.getBank().getActive() && account.getBank().getRemoveDate() == null;
         view.available = view.active && view.bankActive && account.getRemoveDate() == null; return view;

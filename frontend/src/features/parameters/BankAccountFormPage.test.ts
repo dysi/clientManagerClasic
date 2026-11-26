@@ -17,7 +17,7 @@ import BankAccountFormPage from "./BankAccountFormPage.vue";
 
 const account: BankAccount = {
   id: 7, bankId: 3, bankName: "Banco de prueba", holder: "Titular original",
-  cbu: "0000000000000000000000", alias: "original", active: true, bankActive: true, available: true,
+  cbu: "0000000000000000000000", alias: "original", externalCode: "CTA-07", active: true, bankActive: true, available: true,
 };
 function form() {
   return mount(BankAccountFormPage, {
@@ -43,7 +43,7 @@ describe("Formulario de cuenta bancaria", () => {
       await flushPromises();
       expect(account.holder).toBe("Titular original");
       expect(mocks.save).toHaveBeenCalledWith("bank-accounts", {
-        bankId: 3, holder: "Nuevo titular", cbu: account.cbu, alias: "original", active: true,
+        bankId: 3, holder: "Nuevo titular", cbu: account.cbu, alias: "original", externalCode: "CTA-07", active: true,
       }, 7);
       expect(mocks.push).toHaveBeenCalledWith("/parameters/bank-accounts");
     } finally { wrapper.unmount(); }

@@ -9,7 +9,7 @@ public final class ParameterViews {
     }
     public static class BankAccountView {
         public Long id, bankId;
-        public String bankName, holder, cbu, alias;
+        public String bankName, holder, cbu, alias, externalCode;
         public boolean active, bankActive, available;
     }
 }
