@@ -21,6 +21,9 @@ import { request } from "../../services/http";
 import { displayDateTime, money, today } from "../../services/format";
 import { submitPayment, type PaymentFormContext, type PortalAccount, type PortalPayment, type ReceiptSelection } from "../../services/portal";
 
+const props = defineProps<{ clientId?: number; clientName?: string }>();
+const destination = computed(() => props.clientId == null ? "/portal" : "/payments");
+const formUrl = computed(() => props.clientId == null ? "/web/portal/payment-form" : `/web/api/clients/${props.clientId}/payment-submissions/form`);
 const router = useRouter();
 const confirm = useConfirmAction();
 const now = new Date();
@@ -55,7 +58,7 @@ const steps = ["Elegí la cuenta", "Completá el pago", "Revisá y confirmá"];
 
 onMounted(async () => {
   try {
-    limits.value = await request<PaymentFormContext>("/web/portal/payment-form");
+    limits.value = await request<PaymentFormContext>(formUrl.value);
     accounts.value = limits.value.accounts;
     form.value.contactPhone = limits.value.contactPhone ?? "";
     form.value.amount = limits.value.suggestedAmount;
@@ -68,7 +71,7 @@ async function refreshAccounts() {
   selected.value = null; form.value.bankAccountId = null; validation.value = ""; error.value = "";
   loadingAccounts.value = true; accountsError.value = "";
   try {
-    const context = await request<PaymentFormContext>("/web/portal/payment-form");
+    const context = await request<PaymentFormContext>(formUrl.value);
     accounts.value = context.accounts; limits.value = context;
     // Actualizar cuentas no pisa el importe que el cliente haya escrito o limpiado.
   } catch (failure) { accountsError.value = failure instanceof Error ? failure.message : "No se pudieron actualizar las cuentas."; }
@@ -105,7 +108,8 @@ async function showError() {
   errorSummary.value?.focus({ preventScroll: true });
   errorSummary.value?.scrollIntoView({ block: "center", behavior: "auto" });
 }
-async function advance() {
+async function advance(approve = false) {
+  if (saving.value || (approve && (props.clientId == null || step.value !== 3))) return;
   validation.value = "";
   if (step.value === 1) {
     if (form.value.bankAccountId == null || selected.value == null) { validation.value = "Elegí expresamente una cuenta destinataria."; await showError(); return; }
@@ -119,15 +123,15 @@ async function advance() {
   const payment = await save(() => submitPayment({ bankAccountId: accountId, accountRevision: account.revision, licenseId: form.value.licenseId,
     amount, issuedAt: issuedAt.value, contactPhone: form.value.contactPhone.trim(), method: "TRANSFERENCIA",
     withoutReceipt: form.value.withoutReceipt, noReceiptReason: form.value.withoutReceipt ? form.value.noReceiptReason.trim() : null,
-    comment: form.value.comment.trim() || null, submissionKey: submissionKey.value, descriptions: receipts.value.map(item => item.description.trim() || null) }, files.value), "El pago quedó presentado y pendiente de revisión.");
+    comment: form.value.comment.trim() || null, submissionKey: submissionKey.value, descriptions: receipts.value.map(item => item.description.trim() || null) }, files.value, props.clientId, approve), approve ? "El pago quedó presentado y aprobado." : "El pago quedó presentado y pendiente de revisión.");
   if (payment) { result.value = payment; updateReceipts([]); reset(); }
   else if (error.value) await showError();
 }
-async function cancel() { if (await discard()) await router.push("/portal"); }
+async function cancel() { if (await discard()) await router.push(destination.value); }
 </script>
 <template>
-  <PageHeader :title="result ? 'Pago informado' : 'Informar un pago'" description="Transferencia en pesos argentinos.">
-    <Button v-if="!result" type="button" label="Volver al portal" icon="pi pi-arrow-left" text :disabled="saving" @click="cancel" />
+  <PageHeader :title="result ? 'Pago informado' : 'Informar un pago'" :description="clientId == null ? 'Transferencia en pesos argentinos.' : `Cliente: ${clientName}. Transferencia en pesos argentinos.`">
+    <Button v-if="!result" type="button" :label="clientId == null ? 'Volver al portal' : 'Volver a pagos'" icon="pi pi-arrow-left" text :disabled="saving" @click="cancel" />
   </PageHeader>
   <Skeleton v-if="loading" height="16rem" />
   <Message v-else-if="loadError" severity="error" role="alert">{{ loadError }}</Message>
@@ -135,11 +139,11 @@ async function cancel() { if (await discard()) await router.push("/portal"); }
     <template #title>Recibimos tu presentación #{{ result.id }}</template>
     <template #content>
       <Message severity="success" :closable="false">Tu pago de {{ money(result.amount) }} está {{ result.status === 'PENDIENTE' ? 'pendiente de revisión' : result.status.toLowerCase() }}.</Message>
-      <p class="my-5">La presentación no modifica automáticamente el saldo ni la vigencia de tus licencias.</p>
-      <Button as="router-link" to="/portal" label="Volver al portal" icon="pi pi-check" />
+      <p class="my-5">La presentación no modifica automáticamente el saldo ni la vigencia de las licencias.</p>
+      <Button as="router-link" :to="destination" :label="clientId == null ? 'Volver al portal' : 'Volver a pagos'" icon="pi pi-check" />
     </template>
   </Card>
-  <form v-else novalidate :aria-busy="saving" @submit.prevent="advance">
+  <form v-else novalidate :aria-busy="saving" @submit.prevent="advance()">
     <ol class="mb-6 grid gap-3 sm:grid-cols-3" aria-label="Pasos de la presentación">
       <li v-for="(label, index) in steps" :key="label" :aria-current="step === index + 1 ? 'step' : undefined"
         :class="['rounded-border border p-3 text-sm', step === index + 1 ? 'border-primary bg-highlight font-semibold' : 'border-surface text-muted-color']">{{ index + 1 }}. {{ label }}</li>
@@ -186,7 +190,7 @@ async function cancel() { if (await discard()) await router.push("/portal"); }
           <InputText id="issuedTime" v-model="form.issuedTime" type="time" :disabled="saving" :aria-describedby="field.describedby" fluid />
         </FormField>
         <FormField v-if="limits?.sensitiveAccess" id="license" label="Licencia (opcional)" hint="Podés informar el pago sin asociarlo a una licencia." :error="fields.licenseId" v-slot="field">
-          <EntitySelect input-id="license" v-model="form.licenseId" :label="licenseLabel" kind="portal-licenses" :disabled="saving" :invalid="field.invalid" :describedby="field.describedby" @selected="licenseLabel = $event?.label ?? ''" />
+          <EntitySelect input-id="license" v-model="form.licenseId" :label="licenseLabel" kind="portal-licenses" :client-id="clientId" :disabled="saving" :invalid="field.invalid" :describedby="field.describedby" @selected="licenseLabel = $event?.label ?? ''" />
           <Button v-if="form.licenseId != null" type="button" label="Quitar licencia" text size="small" @click="form.licenseId = null" />
         </FormField>
       </div>
@@ -218,12 +222,13 @@ async function cancel() { if (await discard()) await router.push("/portal"); }
         <div v-if="form.comment" class="sm:col-span-2"><dt class="text-sm text-muted-color">Comentario público</dt><dd class="whitespace-pre-wrap break-words">{{ form.comment }}</dd></div>
       </dl>
       <Message v-if="form.withoutReceipt" severity="warn" :closable="false" class="mt-5">Sin un comprobante asociado, la verificación del pago puede extenderse hasta 48 horas.</Message>
-      <Message severity="info" :closable="false" class="mt-5">El pago quedará pendiente de revisión. Después de presentarlo podrás agregar comentarios y comprobantes desde su detalle. Los datos del pago y los adjuntos enviados se conservan.</Message>
+      <Message severity="info" :closable="false" class="mt-5">{{ clientId == null ? 'El pago quedará pendiente de revisión.' : 'Podés dejar el pago pendiente de revisión o confirmarlo y aprobarlo en una sola operación. La aprobación no ajusta vencimientos ni bloqueos de licencias.' }} Después de presentarlo podrás agregar comentarios y comprobantes desde su detalle. Los datos del pago y los adjuntos enviados se conservan.</Message>
     </template></Card>
     <div class="mt-6 flex flex-wrap justify-end gap-3">
       <Button v-if="step > 1" type="button" label="Atrás" severity="secondary" outlined :disabled="saving" @click="step--; validation = ''" />
       <Button type="button" label="Cancelar" severity="secondary" text :disabled="saving" @click="cancel" />
-      <Button type="submit" :label="step === 3 ? 'Confirmar presentación' : 'Continuar'" :icon="step === 3 ? 'pi pi-check' : 'pi pi-arrow-right'" :loading="saving" :disabled="step === 1 && (form.bankAccountId == null || loadingAccounts || total === 0)" />
+      <Button v-if="clientId != null && step === 3" type="button" label="Confirmar y aprobar" icon="pi pi-check-circle" severity="success" :loading="saving" :disabled="saving" @click="advance(true)" />
+      <Button type="submit" :label="step === 3 ? 'Confirmar presentación' : 'Continuar'" :icon="step === 3 ? 'pi pi-check' : 'pi pi-arrow-right'" :loading="saving" :disabled="saving || (step === 1 && (form.bankAccountId == null || loadingAccounts || total === 0))" />
     </div>
   </form>
 </template>

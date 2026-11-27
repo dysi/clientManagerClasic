@@ -257,7 +257,20 @@ class WebFrontendTests {
         em.persist(decision); em.flush();
         mvc.perform(get("/web/api/payments").session(browser.session).param("status", "APROBADO"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].decidedBy").value(actor.getUsername()));
-
+        String reviewPath = "/web/api/payments/" + payment.getId();
+        JsonNode comment = write(browser, "POST", reviewPath + "/comments",
+                java.util.Map.of("text", "Nota interna de revisión", "visibility", "PRIVADO"), 200);
+        mvc.perform(get(reviewPath + "/activity").session(browser.session).param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].kind").value("COMENTARIO"))
+                .andExpect(jsonPath("$.content[0].comment.id").value(comment.get("id").asLong()))
+                .andExpect(jsonPath("$.content[0].comment.visibility").value("PRIVADO"));
+        mvc.perform(get(reviewPath + "/activity").session(browser.session).param("size", "1").param("page", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].kind").value("ESTADO"))
+                .andExpect(jsonPath("$.content[0].history.newStatus").value("APROBADO"));
+        mvc.perform(get(reviewPath + "/activity").session(browser.session).param("size", "101"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test void userProfilePreservesPasswordAndMaintainsBothSidesOfClientLink() throws Exception {

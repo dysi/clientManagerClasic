@@ -38,8 +38,11 @@ public class PaymentReviewService {
     private final ClientRepository clients;
     private final ZoneId businessZone;
     private final LicenseExtensionService extensions;
+    private final PaymentActivityRepository activity;
     public PaymentReviewService(EntityManager em, PaymentRepository payments, LicenseRepository licenses,
-            ClientRepository clients, @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String timeZone, LicenseExtensionService extensions) {
+            ClientRepository clients, @Value("${portal.review.time-zone:America/Argentina/Buenos_Aires}") String timeZone,
+            LicenseExtensionService extensions, PaymentActivityRepository activity) {
+        this.activity = activity;
         this.extensions = extensions;
         this.em = em; this.payments = payments; this.licenses = licenses; this.clients = clients;
         this.businessZone = ZoneId.of(timeZone);
@@ -133,6 +136,29 @@ public class PaymentReviewService {
         return entities("pc", "PaymentComment pc join fetch pc.comment c left join fetch c.author", "PaymentComment pc join pc.comment c",
                 "pc.payment.id = :id and pc.removeDate is null and c.removeDate is null", PaymentComment.class, id, page, size).map(link -> commentView(link.getComment()));
     }
+    public Page<PaymentReviewViews.Activity> activity(Long id, int page, int size) {
+        actor(); payment(id);
+        Page<PaymentActivityRepository.Reference> references = activity.findByPayment(id, page(page, size));
+        List<Long> commentIds = new ArrayList<>(), historyIds = new ArrayList<>();
+        for (PaymentActivityRepository.Reference reference : references) {
+            if ("COMENTARIO".equals(reference.kind)) commentIds.add(reference.id);
+            else historyIds.add(reference.id);
+        }
+        Map<Long, Comment> comments = new HashMap<>();
+        if (!commentIds.isEmpty()) for (Comment comment : em.createQuery(
+                "select c from Comment c left join fetch c.author where c.id in :ids", Comment.class)
+                .setParameter("ids", commentIds).getResultList()) comments.put(comment.getId(), comment);
+        Map<Long, PaymentStatusHistory> events = new HashMap<>();
+        if (!historyIds.isEmpty()) for (PaymentStatusHistory event : em.createQuery(
+                "select h from PaymentStatusHistory h left join fetch h.responsibleUser where h.id in :ids", PaymentStatusHistory.class)
+                .setParameter("ids", historyIds).getResultList()) events.put(event.getId(), event);
+        return references.map(reference -> {
+            PaymentReviewViews.Activity view = new PaymentReviewViews.Activity(); view.kind = reference.kind;
+            if ("COMENTARIO".equals(reference.kind)) view.comment = commentView(comments.get(reference.id));
+            else view.history = historyView(events.get(reference.id));
+            return view;
+        });
+    }
     public Page<PaymentReviewViews.Receipt> receipts(Long id, int page, int size) {
         actor(); payment(id);
         return entities("pa", "PaymentAttachment pa join fetch pa.attachment a left join fetch a.uploadedBy", "PaymentAttachment pa join pa.attachment a",
@@ -146,12 +172,13 @@ public class PaymentReviewService {
     public Page<PaymentReviewViews.History> history(Long id, int page, int size) {
         actor(); payment(id);
         return entities("h", "PaymentStatusHistory h left join fetch h.responsibleUser", "PaymentStatusHistory h",
-                "h.payment.id = :id", PaymentStatusHistory.class, id, page, size).map(event -> {
-            PaymentReviewViews.History view = new PaymentReviewViews.History(); view.id = event.getId();
-            view.previousStatus = event.getPreviousStatus() == null ? null : event.getPreviousStatus().name();
-            view.newStatus = event.getNewStatus().name(); view.reason = event.getReason(); view.occurredAt = event.getOccurredAt();
-            view.origin = event.getOrigin().name(); view.responsible = actorView(event.getResponsibleUser()); return view;
-        });
+                "h.payment.id = :id", PaymentStatusHistory.class, id, page, size).map(this::historyView);
+    }
+    private PaymentReviewViews.History historyView(PaymentStatusHistory event) {
+        PaymentReviewViews.History view = new PaymentReviewViews.History(); view.id = event.getId();
+        view.previousStatus = event.getPreviousStatus() == null ? null : event.getPreviousStatus().name();
+        view.newStatus = event.getNewStatus().name(); view.reason = event.getReason(); view.occurredAt = event.getOccurredAt();
+        view.origin = event.getOrigin().name(); view.responsible = actorView(event.getResponsibleUser()); return view;
     }
     public Page<PaymentReviewViews.LicenseEvent> licenseEvents(Long id, int page, int size) {
         actor(); payment(id);
@@ -216,7 +243,8 @@ public class PaymentReviewService {
             em.persist(delivery);
         }
         for (Change change : plan.changes) apply(payment, change, actor, now);
-        history(payment, previous, PaymentStatus.APROBADO, input.reason.trim(), actor, now); em.flush(); return detailView(payment);
+        String reason = input.reason == null ? null : input.reason.trim();
+        history(payment, previous, PaymentStatus.APROBADO, reason == null || reason.isEmpty() ? null : reason, actor, now); em.flush(); return detailView(payment);
     }
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, timeout = 120)
     public PaymentReviewViews.Detail reject(Long id, PaymentReviewInputs.Rejection input) {
@@ -301,7 +329,8 @@ public class PaymentReviewService {
         event.setNewStatus(next); event.setReason(reason); event.setOccurredAt(now); event.setResponsibleUser(actor);
         event.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); em.persist(event);
         Comment comment = new Comment(); comment.setVisibility(CommentVisibility.PUBLICO);
-        comment.setText("Cambio de estado: " + previous + " → " + next + ". Comentario del auditor: " + reason);
+        comment.setText("Cambio de estado: " + previous + " → " + next
+                + (reason == null ? "." : ". Comentario del auditor: " + reason));
         comment.setAuthor(actor); comment.setOrigin(OperationOrigin.ACCESO_AUTENTICADO); comment.setOccurredAt(now); em.persist(comment);
         PaymentComment link = new PaymentComment(); link.setPayment(payment); link.setComment(comment); em.persist(link);
     }

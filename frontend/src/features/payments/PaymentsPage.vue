@@ -77,7 +77,9 @@ async function navigate(next = 0, count = size.value) {
 }
 </script>
 <template>
-  <PageHeader title="Pagos" description="Consulta y revisión administrativa de pagos informados." />
+  <PageHeader title="Pagos" description="Consulta y revisión administrativa de pagos informados.">
+    <Button as="router-link" to="/payments/new" label="Informar un pago" icon="pi pi-plus" />
+  </PageHeader>
   <Message v-if="licenseId" severity="info" class="mb-4">Pagos de {{ route.query.companyName || `la licencia #${licenseId}` }}. <RouterLink to="/payments" class="underline">Ver todos</RouterLink></Message>
   <Message v-if="error" severity="error" role="alert" class="mb-4">{{ error }}</Message>
   <Card><template #content>

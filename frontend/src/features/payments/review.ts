@@ -13,7 +13,10 @@ export interface ReviewDetail {
 }
 export interface ReviewComment { id: number; text: string; visibility: "PUBLICO" | "PRIVADO"; origin: string; occurredAt: string; author: Actor | null }
 export interface ReviewReceipt { id: number; originalName: string; description: string | null; mimeType: string; size: number; uploadedAt: string; uploadedBy: Actor | null; origin: string }
-export interface History { id: number; previousStatus: string | null; newStatus: string; reason: string | null; origin: string; occurredAt: string; responsible: Actor | null }
+export interface History { id: number; previousStatus: Payment["status"] | null; newStatus: Payment["status"]; reason: string | null; origin: string; occurredAt: string; responsible: Actor | null }
+export type ReviewActivity =
+  | { kind: "COMENTARIO"; comment: ReviewComment; history: null }
+  | { kind: "ESTADO"; comment: null; history: History };
 export interface LicenseEvent { id: number; licenseId: number; companyName: string; actionType: "DESBLOQUEO" | "VENCIMIENTO"; previousValue: string | null; newValue: string; occurredAt: string; responsible: Actor | null }
 export interface LicenseAction { licenseId: number; revision: string; unlock: boolean; updateExpiry: boolean; lockDate: string | null; confirmShortening: boolean }
 export interface PreviewLicense extends LicenseOption { unlock: boolean; updateExpiry: boolean; shortening: boolean; proposedDate: string | null; daysFromToday: number | null; differenceFromPrevious: number | null; resultingStatus: string }

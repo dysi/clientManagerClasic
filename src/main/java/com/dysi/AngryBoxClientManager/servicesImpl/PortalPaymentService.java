@@ -2,6 +2,8 @@ package com.dysi.AngryBoxClientManager.servicesImpl;
 
 import com.dysi.AngryBoxClientManager.mail.PaymentMailAlert;
 import com.dysi.AngryBoxClientManager.dtos.PortalInputs;
+import com.dysi.AngryBoxClientManager.dtos.PaymentReviewInputs;
+import com.dysi.AngryBoxClientManager.dtos.PaymentReviewViews;
 import com.dysi.AngryBoxClientManager.dtos.PortalViews;
 import com.dysi.AngryBoxClientManager.models.*;
 import com.dysi.AngryBoxClientManager.repositories.*;
@@ -31,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class PortalPaymentService {
     private static final Logger LOG = LoggerFactory.getLogger(PortalPaymentService.class);
     private final PaymentMailAlert mailAlert;
+    private final PaymentReviewService review;
     private final LicenseExtensionService extensions;
     private final PortalAccessService access;
     private final ClientRepository clients;
@@ -42,7 +45,8 @@ public class PortalPaymentService {
 
     public PortalPaymentService(PortalAccessService access, ClientRepository clients, PaymentRepository payments,
             EntityManager em, ReceiptProcessor processor, ReceiptStorage storage, PlatformTransactionManager manager,
-            PaymentMailAlert mailAlert, LicenseExtensionService extensions) {
+            PaymentMailAlert mailAlert, LicenseExtensionService extensions, PaymentReviewService review) {
+        this.review = review;
         this.extensions = extensions;
         this.mailAlert = mailAlert;
         this.access = access; this.clients = clients; this.payments = payments; this.em = em;
@@ -54,7 +58,22 @@ public class PortalPaymentService {
     }
 
     public PortalViews.Payment submit(PortalPrincipal principal, PortalInputs.Submission input, List<MultipartFile> files) {
-        access.revalidate(principal);
+        return submit(() -> access.revalidate(principal), input, files, false);
+    }
+
+    /** El administrador conserva su identidad y no necesita una cuenta vinculada al cliente. */
+    public PortalViews.Payment submitForClient(Long clientId, PortalInputs.Submission input, List<MultipartFile> files) {
+        return submit(() -> adminPresenter(clientId), input, files, false);
+    }
+
+    /** Alta y aprobación atómicas, sin acciones sobre licencias ni alerta de pago pendiente. */
+    public PortalViews.Payment submitAndApproveForClient(Long clientId, PortalInputs.Submission input, List<MultipartFile> files) {
+        return submit(() -> adminPresenter(clientId), input, files, true);
+    }
+
+    private PortalViews.Payment submit(java.util.function.Supplier<PortalPrincipal> presenter, PortalInputs.Submission input, List<MultipartFile> files,
+            boolean approveOnSubmission) {
+        presenter.get();
         validate(input, files.size());
         validateDescriptions(input, files.size());
         // La decodificación ocurre antes de tomar bloqueos de base de datos.
@@ -63,7 +82,7 @@ public class PortalPaymentService {
         try {
             return transaction.execute(status -> {
                 enlist(receipts); enlisted.set(true);
-                return create(principal, input, receipts);
+                return create(presenter, input, receipts, approveOnSubmission);
             });
         } finally {
             // Si no empezó una transacción, no habrá callback que limpie los temporales.
@@ -71,13 +90,14 @@ public class PortalPaymentService {
         }
     }
 
-    private PortalViews.Payment create(PortalPrincipal principal, PortalInputs.Submission input, List<PreparedReceipt> receipts) {
-        PortalPrincipal current = access.revalidate(principal);
+    private PortalViews.Payment create(java.util.function.Supplier<PortalPrincipal> presenter, PortalInputs.Submission input, List<PreparedReceipt> receipts,
+            boolean approveOnSubmission) {
+        PortalPrincipal current = presenter.get();
         Client client = clients.lockPortalClient(current.getClientId()).orElseThrow(this::missing);
         // OSIV puede conservar entidades de la validación previa a procesar los archivos.
         em.refresh(client);
-        em.refresh(em.find(User.class, principal.getId()));
-        current = access.revalidate(principal);
+        em.refresh(em.find(User.class, current.getId()));
+        current = presenter.get();
         Optional<Payment> previous = payments.findByClientIdAndSubmissionKey(client.getId(), input.submissionKey);
         if (previous.isPresent()) {
             Payment payment = previous.get();
@@ -86,7 +106,7 @@ public class PortalPaymentService {
             // No promover los nuevos temporales de un reenvío; la evidencia original permanece.
             processor.discard(receipts);
             receipts.clear();
-            return PortalReadService.paymentView(payment, rejectionReason(payment));
+            return approveOnSubmission ? approveSubmission(payment) : PortalReadService.paymentView(payment, rejectionReason(payment));
         }
         BankAccount account = em.find(BankAccount.class, input.bankAccountId, LockModeType.PESSIMISTIC_READ);
         if (account == null || account.getRemoveDate() != null) throw missing();
@@ -116,8 +136,39 @@ public class PortalPaymentService {
         if (text(input.comment) != null) addComment(payment, text(input.comment), current, now);
         persistReceipts(payment, current, receipts, input.descriptions, null, now);
         em.flush();
+        if (approveOnSubmission) return approveSubmission(payment);
         mailAlert.afterCreation(payment, receipts.size());
         return PortalReadService.paymentView(payment, null);
+    }
+
+    private PortalViews.Payment approveSubmission(Payment payment) {
+        // Reenviar un alta ya aprobada no duplica decisiones ni entregas a AngryBox.
+        if (payment.getStatus() == PaymentStatus.APROBADO) return PortalReadService.paymentView(payment, null);
+        if (payment.getStatus() != PaymentStatus.PENDIENTE)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El pago ya fue resuelto. Revisá su detalle antes de continuar.");
+        PaymentReviewInputs.Options options = new PaymentReviewInputs.Options();
+        options.version = payment.getVersion();
+        PaymentReviewViews.Preview preview = review.preview(payment.getId(), options);
+        PaymentReviewInputs.Approval approval = new PaymentReviewInputs.Approval();
+        approval.version = options.version; approval.reviewedOn = preview.today; approval.previewToken = preview.token;
+        review.approve(payment.getId(), approval);
+        return PortalReadService.paymentView(payment, null);
+    }
+
+    /** Identidad interna para la escritura compartida; nunca reemplaza el principal de sesión. */
+    private PortalPrincipal adminPresenter(Long clientId) {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof com.dysi.AngryBoxClientManager.security.JwtUser)
+                || auth.getPrincipal() instanceof PortalPrincipal
+                || auth.getAuthorities().stream().noneMatch(role -> role.getAuthority().equals("ROLE_ADMIN")))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Se requiere acceso administrativo autenticado.");
+        User actor = em.find(User.class, ((com.dysi.AngryBoxClientManager.security.JwtUser) auth.getPrincipal()).getId());
+        if (actor == null || actor.getRemoveDate() != null || !Boolean.TRUE.equals(actor.getEnabled())
+                || actor.getAuthorities().stream().noneMatch(role -> role.getName() == AuthorityName.ROLE_ADMIN))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Se requiere un administrador vigente.");
+        Client client = clients.findById(clientId).orElseThrow(this::missing);
+        if (client.getRemoveDate() != null) throw missing();
+        return new PortalPrincipal(clientId, actor, OperationOrigin.ACCESO_AUTENTICADO);
     }
 
     /** Agrega evidencia sin cambiar los datos ni el estado original del pago. */

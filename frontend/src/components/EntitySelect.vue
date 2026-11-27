@@ -11,6 +11,7 @@ const props = defineProps<{
   modelValue: number | null;
   label?: string;
   kind: "clients" | "licenses" | "banks" | "portal-licenses" | "payment-bank-accounts";
+  clientId?: number;
   inputId: string;
   disabled?: boolean;
   invalid?: boolean;
@@ -44,7 +45,7 @@ async function search(event: { query: string }) {
   try {
     const params = new URLSearchParams({ keyword: event.query, size: "25" });
     const result = props.kind === "portal-licenses"
-      ? (await request<{ content: { id: number; companyName: string }[] }>(`/web/portal/licenses?${params}`))
+      ? (await request<{ content: { id: number; companyName: string }[] }>(props.clientId == null ? `/web/portal/licenses?${params}` : `/web/api/clients/${props.clientId}/payment-submissions/licenses?${params}`))
           .content.map((license) => ({ id: license.id, label: license.companyName }))
       : await request<Option[]>(`/web/api/options/${props.kind}?${params}`);
     if (current === sequence) suggestions.value = result;

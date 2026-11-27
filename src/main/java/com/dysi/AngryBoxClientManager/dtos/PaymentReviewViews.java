@@ -38,6 +38,11 @@ public final class PaymentReviewViews {
         public LocalDateTime occurredAt;
         public Actor responsible;
     }
+    public static class Activity {
+        public String kind;
+        public Comment comment;
+        public History history;
+    }
     public static class LicenseEvent {
         public Long id, licenseId;
         public String companyName, actionType, previousValue, newValue;

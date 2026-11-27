@@ -82,11 +82,12 @@ export interface PortalSubmission {
   submissionKey: string;
   descriptions: (string | null)[];
 }
-export function submitPayment(data: PortalSubmission, receipts: File[]) {
+export function submitPayment(data: PortalSubmission, receipts: File[], clientId?: number, approve = false) {
+  if (approve && clientId == null) throw new Error("Se requiere un cliente seleccionado para aprobar el pago.");
   const body = new FormData();
   body.append("data", new Blob([JSON.stringify(data)], { type: "application/json" }));
   for (const file of receipts) body.append("receipts", file);
-  return request<PortalPayment>("/web/portal/payments", { method: "POST", body });
+  return request<PortalPayment>(clientId == null ? "/web/portal/payments" : `/web/api/clients/${clientId}/payment-submissions${approve ? "/approve" : ""}`, { method: "POST", body });
 }
 export const overviewLabels: Record<NonNullable<PortalOverview["state"]>, string> = {
   SIN_LICENCIAS: "Sin licencias registradas", CON_RESTRICCIONES: "Tenés licencias bloqueadas o vencidas",

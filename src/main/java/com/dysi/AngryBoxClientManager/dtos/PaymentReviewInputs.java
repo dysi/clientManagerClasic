@@ -44,7 +44,7 @@ public final class PaymentReviewInputs {
         public List<LicenseAction> getLicenses() { return licenses; }
     }
     public static class Approval extends Options {
-        @NotBlank @Size(max = 1000) public String reason;
+        @Size(max = 1000) public String reason;
         @NotNull public LocalDate reviewedOn;
         @NotBlank @Pattern(regexp = "[a-f0-9]{64}") public String previewToken;
     }

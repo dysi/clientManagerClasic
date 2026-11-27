@@ -74,6 +74,16 @@ public class PortalReadService {
     public Page<PortalViews.License> licenses(PortalPrincipal principal, String keyword, int page, int size) {
         access.requireSensitiveAccess(principal);
         Long clientId = access.revalidate(principal).getClientId();
+        return licensePage(clientId, keyword, page, size);
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public Page<PortalViews.License> adminLicenses(Long clientId, String keyword, int page, int size) {
+        requireActiveClient(clientId);
+        return licensePage(clientId, keyword, page, size);
+    }
+
+    private Page<PortalViews.License> licensePage(Long clientId, String keyword, int page, int size) {
         return licenses.findAll(ownLicenses(clientId, keyword), page(page, size, "companyName", "id"))
                 .map(license -> {
                     com.dysi.AngryBoxClientManager.dtos.AdminViews.LicenseView source = WebAdminService.licenseView(license);
@@ -101,8 +111,23 @@ public class PortalReadService {
 
     public PortalViews.FormContext form(PortalPrincipal principal) {
         Long clientId = access.revalidate(principal).getClientId();
+        return formForClient(clientId, principal.getOrigin() == OperationOrigin.ACCESO_AUTENTICADO);
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public PortalViews.FormContext adminForm(Long clientId) {
+        requireActiveClient(clientId);
+        return formForClient(clientId, true);
+    }
+
+    private void requireActiveClient(Long clientId) {
+        Client client = clients.findById(clientId).orElseThrow(this::missing);
+        if (client.getRemoveDate() != null) throw missing();
+    }
+
+    private PortalViews.FormContext formForClient(Long clientId, boolean sensitiveAccess) {
         PortalViews.FormContext form = new PortalViews.FormContext();
-        form.sensitiveAccess = principal.getOrigin() == OperationOrigin.ACCESO_AUTENTICADO;
+        form.sensitiveAccess = sensitiveAccess;
         if (form.sensitiveAccess) form.contactPhone = clients.findById(clientId).orElseThrow(this::missing).getPhone();
         // Es un catálogo pequeño de cuentas disponibles; el formulario lo presenta completo.
         form.accounts = accounts.findAll(availableAccounts(), Sort.by("bank.name", "id")).stream()

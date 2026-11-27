@@ -108,7 +108,7 @@ public class AngryboxPaymentSyncService {
         }
         String filter = minimum == null ? "" : " and p.creationDate >= :minimum";
         TypedQuery<AngryboxPaymentDelivery> query = em.createQuery(
-                "select d from AngryboxPaymentDelivery d join fetch d.payment p join fetch p.client "
+                "select d from AngryboxPaymentDelivery d join fetch d.payment p join fetch p.client left join fetch p.bankAccount "
                 + "where d.deliveredAt is null and d.removeDate is null and d.paymentId > :after "
                 + "and d.paymentId <= :until and p.status = :status and p.removeDate is null"
                 + filter + " order by d.paymentId", AngryboxPaymentDelivery.class);
@@ -181,12 +181,14 @@ public class AngryboxPaymentSyncService {
         return hashValues(id, code, dni, cuit);
     }
 
-    /** Conservar la fotografia original del pago: no consultar la cuenta bancaria editable actual. */
+    /** Banco, titular, CBU y alias conservan la foto original; solo externalCode es configuración vigente. */
     private CuentaDestino cuentaDestino(Payment payment) {
+        String externalCode = payment.getBankAccount() == null ? null : payment.getBankAccount().getExternalCode();
         if (AngryboxClientMatcher.text(payment.getDestinationBank()).isEmpty()
                 && AngryboxClientMatcher.text(payment.getDestinationHolder()).isEmpty()
                 && AngryboxClientMatcher.text(payment.getDestinationCbu()).isEmpty()
-                && AngryboxClientMatcher.text(payment.getDestinationAlias()).isEmpty()) {
+                && AngryboxClientMatcher.text(payment.getDestinationAlias()).isEmpty()
+                && AngryboxClientMatcher.text(externalCode).isEmpty()) {
             return null;
         }
         CuentaDestino cuenta = new CuentaDestino();
@@ -194,6 +196,7 @@ public class AngryboxPaymentSyncService {
         cuenta.titular = payment.getDestinationHolder();
         cuenta.cbu = payment.getDestinationCbu();
         cuenta.alias = payment.getDestinationAlias();
+        cuenta.externalCode = externalCode;
         return cuenta;
     }
 

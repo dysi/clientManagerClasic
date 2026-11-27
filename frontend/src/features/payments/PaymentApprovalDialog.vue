@@ -97,7 +97,7 @@ async function review() {
   } catch (failure) { if (active && current === sequence) error.value = failure instanceof Error ? failure.message : "No se pudo preparar la revisión."; }
   finally { if (active) previewing.value = false; }
 }
-const ready = computed(() => draft.value.reason.trim().length > 0 && step.value === "review" && preview.value != null && preview.value.licenses.every(item =>
+const ready = computed(() => step.value === "review" && preview.value != null && preview.value.licenses.every(item =>
   !item.shortening || draft.value.selections.find(row => row.license.id === item.id)?.confirmShortening));
 function confirmShortening(id: number, value: boolean) {
   const row = draft.value.selections.find(item => item.license.id === id);
@@ -124,8 +124,8 @@ async function close() {
       <Message v-if="loadError" severity="error" role="alert">{{ loadError }} <Button type="button" label="Reintentar" text size="small" @click="load" /></Message>
       <Skeleton v-if="loading" height="12rem" />
       <template v-else-if="loaded">
-        <FormField id="approvalReason" label="Comentario público del auditor" required v-slot="field"><Textarea id="approvalReason" v-model="draft.reason" rows="3" maxlength="1000" required :disabled="saving" :aria-describedby="field.describedby" fluid /></FormField>
-        <Message severity="info" :closable="false">La decisión queda registrada con tu usuario y comentario, visible para el cliente. No revierte acciones anteriores sobre licencias.</Message>
+        <FormField id="approvalReason" label="Comentario público del auditor (opcional)" v-slot="field"><Textarea id="approvalReason" v-model="draft.reason" rows="3" maxlength="1000" :disabled="saving" :aria-describedby="field.describedby" fluid /></FormField>
+        <Message severity="info" :closable="false">La decisión queda registrada con tu usuario. Si agregás un comentario, será visible para el cliente. No revierte acciones anteriores sobre licencias.</Message>
         <PaymentSyncWarning :synchronized-at="detail.payment.angryboxSynchronizedAt" />
         <p class="font-medium" role="status">{{ summary }}</p>
         <template v-if="step === 'adjust'">

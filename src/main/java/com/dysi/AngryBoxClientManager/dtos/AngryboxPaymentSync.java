@@ -31,6 +31,7 @@ public final class AngryboxPaymentSync {
 
     public static class Page {
         public int versionContrato = 1;
+        public boolean vinculacionCuentasPuestosDisponible = true;
         public long until;
         public long next;
         public boolean hasMore;
@@ -56,6 +57,8 @@ public final class AngryboxPaymentSync {
         public String titular;
         public String cbu;
         public String alias;
+        /** Configuración vigente de enrutamiento, independiente de la fotografía bancaria. */
+        public String externalCode;
     }
 
     public static class Ack {

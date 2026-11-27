@@ -26,6 +26,8 @@ public class WebPaymentReviewController {
     @GetMapping("/comments") public Page<PaymentReviewViews.Comment> comments(@PathVariable Long id,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.comments(id, page, size); }
     @PostMapping("/comments") public PaymentReviewViews.Comment comment(@PathVariable Long id, @Valid @RequestBody PaymentReviewInputs.CommentInput input) { return service.comment(id, input); }
+    @GetMapping("/activity") public Page<PaymentReviewViews.Activity> activity(@PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.activity(id, page, size); }
     @GetMapping("/attachments") public Page<PaymentReviewViews.Receipt> receipts(@PathVariable Long id,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.receipts(id, page, size); }
     @GetMapping("/history") public Page<PaymentReviewViews.History> history(@PathVariable Long id,
